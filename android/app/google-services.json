@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1048764100456",
+    "project_id": "altura-891fb",
+    "storage_bucket": "altura-891fb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1048764100456:android:6aa16234dfcb39d2a730dd",
+        "android_client_info": {
+          "package_name": "me.fabriziomoro.altura"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyt2hvjk6WEBWzFfjeiHBlLOQxh61OA44"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
