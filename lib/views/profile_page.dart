@@ -64,7 +64,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     // Contatori
     final segnapostiCount = _user!.uploadedPlaces.length;
-    final salvatiCount = _user!.savedPlaces.length;
+    final salvatiCount = _user!.favoritePlaces.length;
 
     // flightExperience -> stringa
     final flightExperienceString =

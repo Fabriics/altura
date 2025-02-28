@@ -3,6 +3,7 @@ import 'package:altura/services/change_password.dart';
 import 'package:altura/services/forgot_password.dart';
 import 'package:altura/views/complete_profile_page.dart';
 import 'package:altura/views/login_page.dart';
+import 'package:altura/views/main_screen.dart';
 import 'package:altura/views/onboarding_page.dart';
 import 'package:altura/views/profile_page.dart';
 import 'package:altura/views/settings_page.dart';
@@ -36,7 +37,7 @@ class MyApp extends StatelessWidget {
           stream: Auth().authStateChanges,
           builder: (context, snapshot){
             if(snapshot.hasData){
-              return HomePage();
+              return MainScreen();
             }else{
               return OnboardingPage();
             }

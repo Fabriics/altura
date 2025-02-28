@@ -2,23 +2,21 @@ class AppUser {
   final String uid;
   final String? email;
   final String username;
-  final String? profilePictureUrl; // <--- esiste già
+  final String? profilePictureUrl;
   final String? bio;
   final String? location;
-  final List<String> savedPlaces;
+  final List<String> favoritePlaces;
   final List<String> uploadedPlaces;
   final List<String> purchasedItems;
   final DateTime createdAt;
   final DateTime lastLogin;
   final bool isEmailVerified;
   final List<String> drones;
-
-  // AGGIUNGI questi nuovi campi
-  final String? profileImageUrl;     // <-- per la foto caricata
-  final int? flightExperience;       // <-- anni di volo
-  final String? instagram;           // <-- se l'utente inserisce instagram
-  final String? youtube;             // <-- canale youtube
-  final String? website;             // <-- sito web
+  final String? profileImageUrl;
+  final int? flightExperience;
+  final String? instagram;
+  final String? youtube;
+  final String? website;
 
   AppUser({
     required this.uid,
@@ -27,15 +25,13 @@ class AppUser {
     this.profilePictureUrl,
     this.bio,
     this.location,
-    this.savedPlaces = const [],
+    this.favoritePlaces = const [],
     this.uploadedPlaces = const [],
     this.purchasedItems = const [],
     required this.createdAt,
     required this.lastLogin,
     this.isEmailVerified = false,
     this.drones = const [],
-
-    // Nuovi campi nel costruttore
     this.profileImageUrl,
     this.flightExperience,
     this.instagram,
@@ -51,15 +47,13 @@ class AppUser {
       'profilePictureUrl': profilePictureUrl,
       'bio': bio,
       'location': location,
-      'savedPlaces': savedPlaces,
+      'savedPlaces': favoritePlaces,
       'uploadedPlaces': uploadedPlaces,
       'purchasedItems': purchasedItems,
       'createdAt': createdAt.toIso8601String(),
       'lastLogin': lastLogin.toIso8601String(),
       'isEmailVerified': isEmailVerified,
       'drones': drones,
-
-      // I nuovi campi
       'profileImageUrl': profileImageUrl,
       'flightExperience': flightExperience,
       'instagram': instagram,
@@ -82,10 +76,8 @@ class AppUser {
       lastLogin: DateTime.parse(map['lastLogin']),
       isEmailVerified: map['isEmailVerified'] ?? false,
       drones: List<String>.from(map['drones'] ?? []),
-
-      // Leggiamo i nuovi campi se presenti
       profileImageUrl: map['profileImageUrl'],
-      flightExperience: map['flightExperience'], // se è int
+      flightExperience: map['flightExperience'],
       instagram: map['instagram'],
       youtube: map['youtube'],
       website: map['website'],

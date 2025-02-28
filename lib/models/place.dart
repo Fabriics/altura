@@ -1,19 +1,43 @@
-// lib/models/place.dart
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Modello che rappresenta un segnaposto nell'app.
+///
+/// Utilizza:
+/// - [mediaUrls]: lista di URL dei media (foto e video) caricati su Firebase Storage.
+/// - [mediaFiles]: lista di file locali (foto/video) selezionati dall'utente.
+///   Questo campo non è persistito su Firestore e serve solo durante la fase di caricamento.
 class Place {
+  /// Identificativo univoco del segnaposto.
   final String id;
-  final String name;       // Titolo (in precedenza "Segnaposto #x")
+
+  /// Titolo del segnaposto.
+  final String name;
+
+  /// Latitudine della posizione.
   final double latitude;
+
+  /// Longitudine della posizione.
   final double longitude;
+
+  /// ID dell'utente che ha creato il segnaposto.
   final String userId;
-  final String category;   // Es. "panoramico", "landing", "restrizione", etc.
-  final File? imageFile;
-  final String? imageUrl;
+
+  /// Categoria del segnaposto (es. "panoramico", "landing", ecc.).
+  final String category;
+
+  /// Descrizione opzionale del segnaposto.
   final String? description;
+
+  /// Data di creazione del segnaposto.
   final DateTime? createdAt;
+
+  /// Lista di URL dei media (foto/video) caricati su Firebase Storage.
+  final List<String>? mediaUrls;
+
+  /// Lista di file locali (foto/video) selezionati dall'utente.
+  /// Questo campo non viene salvato su Firestore.
+  final List<File>? mediaFiles;
 
   Place({
     required this.id,
@@ -22,12 +46,14 @@ class Place {
     required this.longitude,
     required this.userId,
     required this.category,
-    this.imageFile,
-    this.imageUrl,
     this.description,
     this.createdAt,
+    this.mediaUrls,
+    this.mediaFiles,
   });
 
+  /// Crea un'istanza di [Place] a partire da una mappa, ad esempio dai dati di Firestore.
+  /// Il campo [mediaFiles] non viene persistito e viene impostato a null.
   factory Place.fromMap(String docId, Map<String, dynamic> data) {
     return Place(
       id: docId,
@@ -36,14 +62,17 @@ class Place {
       longitude: (data['longitude'] ?? 0).toDouble(),
       userId: data['userId'] ?? '',
       category: data['category'] ?? 'other',
-      imageUrl: data['imageUrl'],
       description: data['description'] as String?,
       createdAt: (data['createdAt'] is Timestamp)
           ? (data['createdAt'] as Timestamp).toDate()
           : null,
+      mediaUrls: data['mediaUrls'] != null ? List<String>.from(data['mediaUrls']) : null,
+      mediaFiles: null,
     );
   }
 
+  /// Converte l'istanza in una mappa per il salvataggio su Firestore.
+  /// Non include [mediaFiles] in quanto non persistito.
   Map<String, dynamic> toMap() {
     return {
       'name': name,
@@ -51,19 +80,19 @@ class Place {
       'longitude': longitude,
       'userId': userId,
       'category': category,
-      'imageUrl': imageUrl,
       'description': description,
       'createdAt': createdAt,
+      'mediaUrls': mediaUrls,
     };
   }
 
-  /// Permette la modifica del post
+  /// Metodo per creare una copia modificata dell'istanza.
   Place copyWith({
     String? name,
     String? description,
     String? category,
-    File? imageFile,
-    String? imageUrl,
+    List<String>? mediaUrls,
+    List<File>? mediaFiles,
   }) {
     return Place(
       id: id,
@@ -72,11 +101,10 @@ class Place {
       longitude: longitude,
       userId: userId,
       category: category ?? this.category,
-      imageFile: imageFile ?? this.imageFile,
-      imageUrl: imageUrl ?? this.imageUrl,
       description: description ?? this.description,
       createdAt: createdAt,
+      mediaUrls: mediaUrls ?? this.mediaUrls,
+      mediaFiles: mediaFiles ?? this.mediaFiles,
     );
   }
-
 }
