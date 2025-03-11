@@ -1,7 +1,13 @@
 // lib/views/main_screen.dart
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'home_page.dart'; // Sostituisci con le tue pagine reali
+import '../models/user_model.dart';
+import 'home_page.dart';
+import 'rules_page.dart';
+import 'professionals_page.dart';
+import 'chat_page.dart';
 
 /// MainScreen con Drawer + NavBar galleggiante + pulsante personalizzato
 /// in alto a sinistra per aprire il Drawer.
@@ -14,73 +20,102 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  AppUser? _appUser; // Dati personalizzati dell'utente
 
-  // Pagine principali (aggiungi le altre se necessario)
+  // Pagine principali (Home, Regole, Professionisti, Chat)
   final List<Widget> _pages = const [
     HomePage(),
-    // RulesPage(),
-    // ProfessionalsPage(),
-    // ChatPage(),
+    RulesPage(),
+    ProfessionalsPage(),
+    ChatPage(),
   ];
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
   }
 
+  Future<void> _initUser() async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      debugPrint('Nessun utente loggato (firebaseUser == null)');
+      return;
+    }
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(firebaseUser.uid)
+        .get();
+
+    debugPrint('Doc for user ${firebaseUser.uid}: ${doc.data()}');
+
+    if (doc.exists && doc.data() != null) {
+      final data = doc.data()!;
+      final userModel = AppUser.fromMap(data);
+      setState(() {
+        _appUser = userModel;
+        debugPrint('AppUser caricato con successo: $_appUser');
+      });
+    } else {
+      debugPrint('Il documento non esiste o è vuoto');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _initUser();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Drawer definito qui
       drawer: _buildDrawer(),
 
-      // Body come Stack: pagina + pulsante drawer + nav bar galleggiante
+      // Stack per la pagina e la nav bar flottante
       body: Stack(
         children: [
-          // 1) Pagina selezionata (es. mappa)
+          // 1) Pagina selezionata
           _pages[_selectedIndex],
 
           // 2) Pulsante per aprire il Drawer (in alto a sinistra)
-        Positioned(
-          top: 80.0,
-          left: 16.0,
-          child: Builder(
-            builder: (context) => GestureDetector(
-              onTap: () => Scaffold.of(context).openDrawer(),
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(51),
-                      spreadRadius: 2,
-                      blurRadius: 5,
-                    ),
-                  ],
+          Positioned(
+            top: 80.0,
+            left: 16.0,
+            child: Builder(
+              builder: (context) => GestureDetector(
+                onTap: () => Scaffold.of(context).openDrawer(),
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(51),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.menu, color: Colors.black),
                 ),
-                child: const Icon(Icons.menu, color: Colors.black),
               ),
             ),
           ),
-        ),
 
-          // 3) BottomNavigationBar galleggiante
+          // 3) BottomNavigationBar galleggiante in basso
           Positioned(
             left: 16,
             right: 16,
-            bottom: 16, // Margine dal fondo
+            bottom: 16,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: const [
-                  // Personalizza ombra se vuoi
                   BoxShadow(
-                    // color: Colors.black,
-                    // blurRadius: 8,
-                    // offset: Offset(0, 4),
+                    // Personalizza ombra se vuoi
                   ),
                 ],
               ),
@@ -144,12 +179,13 @@ class _MainScreenState extends State<MainScreen> {
                 ],
               ),
             ),
+            // Esempi di voci di menu...
             ListTile(
               leading: const Icon(Icons.account_circle_outlined, color: Colors.white, size: 28),
               title: const Text('Profilo', style: TextStyle(color: Colors.white, fontSize: 18)),
               onTap: () {
                 Navigator.of(context).pop();
-                Navigator.pushNamed(context, '/profile_page');
+                Navigator.pushNamed(context, '/profile_page', arguments: _appUser);
               },
             ),
             ListTile(

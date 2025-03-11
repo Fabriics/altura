@@ -1,27 +1,25 @@
-// Dart core imports
+// lib/views/home_page.dart
+
 import 'dart:async';
 import 'dart:io';
-import 'dart:convert';
 
-// External packages
+
 import 'package:altura/views/place_details_page.dart';
+import 'package:altura/views/search_page.dart'; // <-- Nuova pagina di ricerca
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:flutter_open_app_settings/flutter_open_app_settings.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-// Internal packages
 import '../models/user_model.dart';
 import '../models/place.dart';
 import '../services/auth.dart';
 import '../services/places_service.dart';
 
-// Categorie aggiornate per i droni
 const List<DropdownMenuItem<String>> kCategoryItems = [
   DropdownMenuItem(value: 'pista_decollo', child: Text('Pista di decollo')),
   DropdownMenuItem(value: 'area_volo_libera', child: Text('Area volo libera')),
@@ -30,7 +28,6 @@ const List<DropdownMenuItem<String>> kCategoryItems = [
   DropdownMenuItem(value: 'altro', child: Text('Altro')),
 ];
 
-/// HomePage: Mappa principale con la gestione dei segnaposti
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -38,43 +35,21 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-/// Stato della HomePage
+/// HomePage: Mappa principale con la gestione dei segnaposti (senza barra di ricerca)
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  // --------------------------------------------------
-  // Variabili Principali
-  // --------------------------------------------------
   GoogleMapController? _mapController;
   final Location _location = Location();
   LocationData? _currentLocation;
-  AppUser? _appUser; // Dati personalizzati dell'utente
+  //AppUser? _appUser;
 
-  // Posizione di default se i permessi sono negati
   final LatLng _defaultPosition = const LatLng(48.488, 13.678);
 
   bool _hasLocationPermission = false;
   bool _isLoading = true;
 
-  /// Flag per mostrare/nascondere la barra di ricerca
-  bool _showSearchBar = false;
-
-  /// Controller per il TextField della ricerca
-  final TextEditingController _searchController = TextEditingController();
-
-  /// Lista di suggerimenti per l'autocomplete
-  List<Map<String, dynamic>> _predictions = [];
-
-  /// StreamSubscription per ascoltare i cambiamenti di posizione
   StreamSubscription<LocationData>? _locationSubscription;
-
-  /// Controller per gestire i segnaposti su Firestore
   late PlacesController _placesController;
 
-  /// API key (Google Places API abilitata)
-  static const _placesApiKey = 'AIzaSyBB6JMMFw8Vz1MniyHuz4_iN3xQ7QbWbv8';
-
-  // --------------------------------------------------
-  // Ciclo di vita
-  // --------------------------------------------------
   @override
   void initState() {
     super.initState();
@@ -97,17 +72,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         .doc(firebaseUser.uid)
         .get();
 
-    debugPrint('Doc for user ${firebaseUser.uid}: ${doc.data()}');
-
     if (doc.exists && doc.data() != null) {
-      final data = doc.data()!;
-      final userModel = AppUser.fromMap(data);
       setState(() {
-        _appUser = userModel;
-        debugPrint('AppUser caricato con successo: $_appUser');
+        //_appUser = AppUser.fromMap(doc.data()!);
       });
     } else {
-      debugPrint('Il documento non esiste o è vuoto');
+      debugPrint('Il documento utente non esiste o è vuoto');
     }
   }
 
@@ -115,7 +85,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _locationSubscription?.cancel();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -126,9 +95,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  // --------------------------------------------------
-  // Funzioni di Inizializzazione e Permessi
-  // --------------------------------------------------
   Future<void> _initLocation() async {
     final localContext = context;
     try {
@@ -215,34 +181,58 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  // --------------------------------------------------
-  // Dialog e Messaggi di errore
-  // --------------------------------------------------
-  void _showSettingsDialog(BuildContext localContext) {
+  void showLocationSettingsDialog(BuildContext context) {
     showDialog(
-      context: localContext,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Permesso di Localizzazione Necessario"),
-        content: const Text("Per continuare, abilita la localizzazione dalle impostazioni dell'app."),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              FlutterOpenAppSettings.openAppsSettings(settingsCode: SettingsCode.APP_SETTINGS);
-            },
-            child: const Text("Vai alle Impostazioni", style: TextStyle(color: Colors.blueAccent)),
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text("Annulla", style: TextStyle(color: Colors.blueAccent)),
+          title: Row(
+            children: [
+              const Icon(Icons.location_off, color: Colors.red),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  "Localizzazione Necessaria",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+          content: const Text(
+            "Per continuare a utilizzare tutte le funzionalità dell'app, abilita la localizzazione dalle impostazioni.",
+            textAlign: TextAlign.justify,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                FlutterOpenAppSettings.openAppsSettings(
+                  settingsCode: SettingsCode.LOCATION,
+                );
+              },
+              child: const Text(
+                "Impostazioni",
+                style: TextStyle(color: Colors.blueAccent, fontSize: 15),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                "Annulla",
+                style: TextStyle(color: Colors.blueAccent, fontSize: 15),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
   void _showErrorDialog(BuildContext localContext, String message) {
-    if (!mounted) return;
     showDialog(
       context: localContext,
       builder: (ctx) => AlertDialog(
@@ -258,16 +248,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  // --------------------------------------------------
-  // Logout
-  // --------------------------------------------------
   Future<void> signOut() async {
     await Auth().signOut();
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, '/login_page');
   }
 
-  // --------------------------------------------------
   // Creazione nuovo segnaposto (Wizard 2 step)
   // --------------------------------------------------
   /// In questa wizard l'utente può selezionare più media (foto e video)
@@ -600,6 +586,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
 
+    if (!_hasLocationPermission || _currentLocation == null) {
+      showLocationSettingsDialog(context);
+      return;
+    }
     final info = await _showAddPlaceWizard(localContext);
     if (info == null) return;
 
@@ -637,7 +627,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
     if (!_hasLocationPermission || _currentLocation == null) {
-      _showErrorDialog(localContext, 'Posizione non disponibile o permessi non concessi.');
+      showLocationSettingsDialog(context);
       return;
     }
 
@@ -1047,260 +1037,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return result;
   }
 
-  // --------------------------------------------------
-  // Barra di ricerca e autocomplete
-  // --------------------------------------------------
-  void _toggleSearchBar() {
-    setState(() {
-      _showSearchBar = !_showSearchBar;
-      if (!_showSearchBar) {
-        _searchController.clear();
-        _predictions.clear();
-      }
-    });
-  }
 
-  Future<void> _getAutocomplete(String input) async {
-    if (input.isEmpty) {
-      setState(() => _predictions = []);
-      return;
-    }
-
-    final endpoint =
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-        '?input=$input'
-        '&types=(cities)'
-        '&language=it'
-        '&key=$_placesApiKey';
-
-    try {
-      final response = await http.get(Uri.parse(endpoint));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final status = data['status'];
-        if (status == 'OK') {
-          final List predictions = data['predictions'];
-          setState(() {
-            _predictions = predictions.map<Map<String, dynamic>>((p) => {
-              'description': p['description'],
-              'place_id': p['place_id'],
-            }).toList();
-          });
-        } else {
-          debugPrint('Autocomplete errore status: $status');
-          setState(() => _predictions = []);
-        }
-      } else {
-        debugPrint('HTTP Error (autocomplete): ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('Errore _getAutocomplete: $e');
-    }
-  }
-
-  Future<void> _goToPlace(String placeId) async {
-    final detailsUrl =
-        'https://maps.googleapis.com/maps/api/place/details/json'
-        '?place_id=$placeId'
-        '&key=$_placesApiKey';
-
-    try {
-      final response = await http.get(Uri.parse(detailsUrl));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK') {
-          final geometry = data['result']['geometry'];
-          final loc = geometry['location'];
-          final lat = loc['lat'];
-          final lng = loc['lng'];
-
-          _mapController?.animateCamera(
-            CameraUpdate.newLatLng(LatLng(lat, lng)),
-          );
-        } else {
-          debugPrint('Place Details errore: ${data['status']}');
-        }
-      } else {
-        debugPrint('HTTP Error (details): ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('Errore _goToPlace: $e');
-    }
-  }
-
-  // --------------------------------------------------
-  // UI Principale (build)
-  // --------------------------------------------------
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _placesController,
-      builder: (context, _) {
-        return Scaffold(
-          //drawer: _buildDrawer(),
-          body: Stack(
-            children: [
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator())
-              else
-                _buildGoogleMap(),
-              if (!_showSearchBar) ...[
-                //_buildMenuButton(),
-                Positioned(
-                  top: 80.0,
-                  right: 16.0,
-                  child: GestureDetector(
-                    onTap: _toggleSearchBar,
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(51),
-                            spreadRadius: 2,
-                            blurRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.search, color: Colors.black),
-                    ),
-                  ),
-                ),
-              ],
-              if (_showSearchBar)
-                Positioned(
-                  top: 80.0,
-                  left: 16.0,
-                  right: 16.0,
-                  child: Column(
-                    children: [
-                      Container(
-                        height: 56.0,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(32),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(51),
-                              spreadRadius: 2,
-                              blurRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                style: const TextStyle(color: Colors.black),
-                                decoration: const InputDecoration(
-                                  hintText: 'Cerca...',
-                                  hintStyle: TextStyle(color: Colors.grey),
-                                  border: InputBorder.none,
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                ),
-                                onChanged: (value) {
-                                  if (value.length > 2) {
-                                    _getAutocomplete(value);
-                                  } else {
-                                    setState(() => _predictions = []);
-                                  }
-                                },
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close, color: Colors.black),
-                              onPressed: _toggleSearchBar,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_predictions.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(top: 1),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(32),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(51),
-                                spreadRadius: 2,
-                                blurRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: _predictions.length,
-                            itemBuilder: (ctx, i) {
-                              final item = _predictions[i];
-                              final description = item['description'] as String;
-                              final placeId = item['place_id'] as String;
-                              return ListTile(
-                                dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                                title: Text(
-                                  description,
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                onTap: () async {
-                                  await _goToPlace(placeId);
-                                  setState(() {
-                                    _predictions.clear();
-                                    _searchController.clear();
-                                    _toggleSearchBar();
-                                  });
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              Positioned(
-                bottom: 100,
-                right: 16,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FloatingActionButton(
-                      heroTag: 'btnLocation',
-                      onPressed: () {
-                        final localContext = context;
-                        if (_hasLocationPermission) {
-                          _moveCameraToCurrentLocation();
-                        } else {
-                          _showSettingsDialog(localContext);
-                        }
-                      },
-                      backgroundColor: Theme.of(context).colorScheme.onPrimary,
-                      child: Icon(
-                        Icons.my_location,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    FloatingActionButton(
-                      heroTag: 'btnAdd',
-                      onPressed: _addMarkerOnMyPosition,
-                      child: const Icon(Icons.add),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
+  /// Costruisce la mappa
   Widget _buildGoogleMap() {
     return GoogleMap(
       onMapCreated: (controller) => _mapController = controller,
@@ -1327,106 +1065,104 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
- /* Widget _buildMenuButton() {
-    return Positioned(
-      top: 80.0,
-      left: 16.0,
-      child: Builder(
-        builder: (context) => GestureDetector(
-          onTap: () => Scaffold.of(context).openDrawer(),
-          child: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(51),
-                  spreadRadius: 2,
-                  blurRadius: 5,
+  void _openSearchPage() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SearchPage()),
+    );
+
+    if (result != null && result is Map<String, dynamic>) {
+      double lat = result['lat'];
+      double lng = result['lng'];
+
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(LatLng(lat, lng)),
+      ); // Funzione che ora implementiamo
+      setState(() {
+        // Puoi scegliere se pulire i marker precedenti o meno
+        _placesController.markers.clear();
+        _placesController.markers.add(
+          Marker(
+            markerId: const MarkerId('searchedLocation'),
+            position: LatLng(lat, lng),
+            infoWindow: const InfoWindow(title: 'Risultato ricerca'),
+            flat: true,
+          ),
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator())
+          else
+            _buildGoogleMap(),
+          // Pulsante di ricerca (in alto a destra)
+          Positioned(
+            top: 80,
+            right: 16,
+            child: GestureDetector(
+              onTap: () {
+                // Naviga verso la SearchPage
+                _openSearchPage();
+              },
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(51),
+                      spreadRadius: 2,
+                      blurRadius: 5,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.search, color: Colors.black),
+              ),
+            ),
+          ),
+
+          // Pulsanti floating in basso a destra
+          Positioned(
+            bottom: 130,
+            right: 16,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton(
+                  heroTag: 'btnLocation',
+                  onPressed: () {
+                    if (_hasLocationPermission) {
+                      _moveCameraToCurrentLocation();
+                    } else {
+                      showLocationSettingsDialog(context);
+                    }
+                  },
+                  backgroundColor: Theme.of(context).colorScheme.onPrimary,
+                  child: Icon(
+                    Icons.my_location,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FloatingActionButton(
+                  heroTag: 'btnAdd',
+                  onPressed: _addMarkerOnMyPosition,
+                  child: const Icon(Icons.add),
                 ),
               ],
             ),
-            child: const Icon(Icons.menu, color: Colors.black),
           ),
-        ),
+        ],
       ),
     );
   }
-
-  Widget _buildDrawer() {
-    return Drawer(
-      child: Container(
-        color: Theme.of(context).colorScheme.primary,
-        child: Column(
-          children: [
-            DrawerHeader(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.flight_takeoff, color: Colors.white, size: 48),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Altura',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_circle_outlined, color: Colors.white, size: 28),
-              title: const Text('Profilo', style: TextStyle(color: Colors.white, fontSize: 18)),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.pushNamed(context, '/profile_page', arguments: _appUser);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings, color: Colors.white, size: 28),
-              title: const Text('Impostazioni', style: TextStyle(color: Colors.white, fontSize: 18)),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.pushNamed(context, '/settings_page');
-              },
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Divider(color: Colors.white70, thickness: 1),
-            ),
-            ListTile(
-              leading: const Icon(Icons.help_outline, color: Colors.white, size: 28),
-              title: const Text('Assistenza e Supporto', style: TextStyle(color: Colors.white, fontSize: 18)),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.pushNamed(context, '/support_page');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.info_outline, color: Colors.white, size: 28),
-              title: const Text('Informazioni su Altura', style: TextStyle(color: Colors.white, fontSize: 18)),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.pushNamed(context, '/about_page');
-              },
-            ),
-            Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.white, size: 28),
-                  title: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 18)),
-                  onTap: signOut,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }*/
 }

@@ -6,6 +6,7 @@ import 'package:altura/views/login_page.dart';
 import 'package:altura/views/main_screen.dart';
 import 'package:altura/views/onboarding_page.dart';
 import 'package:altura/views/profile_page.dart';
+import 'package:altura/views/search_page.dart';
 import 'package:altura/views/settings_page.dart';
 import 'package:altura/views/signup_page.dart';
 import 'package:altura/models/user_model.dart';
@@ -62,7 +63,8 @@ class MyApp extends StatelessWidget {
         '/complete_profile_page' : (context) => const CompleteProfilePage(),
         '/change_password': (context) => const ChangePasswordPage(),
         '/forgot_password': (context) =>  ForgotPasswordPage(),
-        '/edit_profile': (context) => EditProfilePage()
+        '/edit_profile': (context) => EditProfilePage(),
+        '/search_page': (context) => SearchPage(),
       },
 
     );
