@@ -1,6 +1,7 @@
 import 'package:altura/services/auth.dart';
 import 'package:altura/services/change_password.dart';
 import 'package:altura/services/forgot_password.dart';
+import 'package:altura/views/notifications_settings_page.dart';
 import 'package:altura/views/complete_profile_page.dart';
 import 'package:altura/views/login_page.dart';
 import 'package:altura/views/main_screen.dart';
@@ -65,6 +66,7 @@ class MyApp extends StatelessWidget {
         '/forgot_password': (context) =>  ForgotPasswordPage(),
         '/edit_profile': (context) => EditProfilePage(),
         '/search_page': (context) => SearchPage(),
+        '/notification_settings_page' : (context) => NotificationSettingsPage(),
       },
 
     );

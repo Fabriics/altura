@@ -3,9 +3,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({Key? key}) : super(key: key);
+  const SearchPage({super.key});
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -21,11 +22,56 @@ class _SearchPageState extends State<SearchPage> {
   // Sostituisci con la tua Google Places API Key
   static const _placesApiKey = 'AIzaSyBB6JMMFw8Vz1MniyHuz4_iN3xQ7QbWbv8';
 
+  // Lista di ricerche recenti (massimo 3, se vuoi)
+  late List<String> _recentSearches = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentSearches();
+  }
+
+  Future<void> _loadRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Se non esiste ancora, restituisce una lista vuota
+    final storedList = prefs.getStringList('recentSearches') ?? [];
+    setState(() {
+      _recentSearches = storedList;
+    });
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Aggiunge una ricerca ai recenti, mettendola in cima e rimuovendo duplicati
+  Future<void> _addToRecentSearches(String search) async {
+    setState(() {
+      // Rimuove se già presente
+      _recentSearches.removeWhere((item) => item == search);
+      // Inserisce in testa
+      _recentSearches.insert(0, search);
+      debugPrint('RIcerce:$_recentSearches');
+      // Limita a 3 (se vuoi cambiare, modifica qui)
+      if (_recentSearches.length > 3) {
+        _recentSearches.removeLast();
+
+      }
+    });
+      final prefs = await SharedPreferences.getInstance();
+      // Sovrascrive la chiave 'recentSearches'
+      await prefs.setStringList('recentSearches', _recentSearches);
+  }
+
+  /// Rimuove la ricerca in posizione [index], poi salva su disco
+  Future<void> _removeFromRecentSearches(int index) async {
+    setState(() {
+      _recentSearches.removeAt(index);
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('recentSearches', _recentSearches);
   }
 
   /// Funzione per ottenere i suggerimenti di autocomplete
@@ -67,8 +113,8 @@ class _SearchPageState extends State<SearchPage> {
       } else {
         debugPrint('HTTP Error (autocomplete): ${response.statusCode}');
         // (Facoltativo) Se vuoi svuotare i suggerimenti:
-        // if (!mounted) return;
-        // setState(() => _predictions = []);
+         if (!mounted) return;
+         setState(() => _predictions = []);
       }
     } catch (e) {
       debugPrint('Errore _getAutocomplete: $e');
@@ -111,7 +157,7 @@ class _SearchPageState extends State<SearchPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 10,
+        elevation: 0,
         title: Text(
             'Cerca posizione',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -132,7 +178,7 @@ class _SearchPageState extends State<SearchPage> {
               padding: const EdgeInsets.all(16.0),
               child: SearchBar(
                 controller: _searchController,
-                hintText: 'Cerca...',
+                hintText: 'Cerca luoghi...',
                 // Imposta il colore del testo su nero
                 textStyle: WidgetStateProperty.all(
                   const TextStyle(color: Colors.black),
@@ -159,6 +205,98 @@ class _SearchPageState extends State<SearchPage> {
               )
             ),
 
+            // Sezione "RICERCHE RECENTI"
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Visibility(
+                visible: _searchController.text.isEmpty && _recentSearches.isNotEmpty,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Titolo in maiuscolo
+                    Text(
+                      'Ricerche recenti:',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.black87,
+                        //fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Lista di ricerche recenti
+                    ListView.builder(
+                      itemCount: _recentSearches.length,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemBuilder: (context, index) {
+                        final searchText = _recentSearches[index];
+                        return Container(
+                          color: Colors.grey[200],
+                          margin: const EdgeInsets.only(bottom: 4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Testo ricerca
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      // Inseriamo il testo nella searchBar
+                                      _searchController.text = searchText;
+                                      // Aggiorniamo la UI
+                                      setState(() {});
+                                      // Chiediamo subito suggerimenti per la ricerca
+                                      if (searchText.length > 1) {
+                                        _getAutocomplete(searchText);
+                                      } else {
+                                        _predictions.clear();
+                                      }
+                                    },
+                                    child: Text(
+                                      searchText,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // Icona "X" per rimuovere la voce
+                                GestureDetector(
+                                  onTap: () async {
+                                    // Rimuovo e salvo su disco
+                                    await _removeFromRecentSearches(index);
+                                  },
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.black54,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Divider(color: Colors.grey,),
+                ),
             // Lista di suggerimenti
             Expanded(
               child: ListView.builder(
@@ -170,8 +308,15 @@ class _SearchPageState extends State<SearchPage> {
 
                   return ListTile(
                     title: Text(description, style: Theme.of(context).textTheme.bodyLarge),
-                    onTap: () => _goToPlace(placeId),
+                    onTap: ()
+                  {
+                    // Aggiungiamo la ricerca ai recenti
+                    _addToRecentSearches(description);
+                    // Vai al place
+                    _goToPlace(placeId);
+                  }
                   );
+
                 },
               ),
             ),

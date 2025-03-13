@@ -1,4 +1,6 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -9,6 +11,56 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final List<bool> _expanded = [false, false, false, false];
+
+  // Aggiungiamo una variabile di stato per le notifiche
+  bool _notificationsEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Carichiamo la preferenza locale appena la pagina viene creata
+    _loadNotificationPreference();
+  }
+
+  // Carica la preferenza di abilitazione notifiche, per esempio da SharedPreferences
+  Future<void> _loadNotificationPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Se non esiste la chiave 'notifications_enabled', assume false di default
+    final bool isEnabled = prefs.getBool('notifications_enabled') ?? false;
+    setState(() {
+      _notificationsEnabled = isEnabled;
+    });
+  }
+
+  // Salva la preferenza nel momento in cui l’utente abilita/disabilita le notifiche
+  Future<void> _saveNotificationPreference(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', value);
+  }
+
+  // Richiede i permessi di notifica (necessario su iOS, opzionale su Android)
+  Future<void> _requestNotificationPermission() async {
+    NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      debugPrint('Utente ha concesso i permessi di notifica.');
+    } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
+      debugPrint('Autorizzazione provvisoria per le notifiche.');
+    } else {
+      debugPrint('Permesso negato: notifiche non autorizzate.');
+    }
+  }
+
+  // Disabilita la ricezione delle notifiche
+  Future<void> _disableNotifications() async {
+    // Esempio: disiscrivi l’utente da un topic
+    // await FirebaseMessaging.instance.unsubscribeFromTopic('tua_topic');
+    debugPrint('Notifiche disabilitate (logica personalizzabile).');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,9 +98,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   'Gestione Social Login',
                   Icons.link,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Gestione Social Login non implementata.')),
-                    );
+                    // Da implementare
                   },
                 ),
                 _buildListTile(
@@ -69,19 +119,32 @@ class _SettingsPageState extends State<SettingsPage> {
                 _buildSwitchTile(
                   'Abilita Notifiche',
                   Icons.notifications_active,
-                  value: true,
-                  onChanged: (value) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(value ? 'Notifiche abilitate' : 'Notifiche disabilitate')),
-                    );
+                  value: _notificationsEnabled,
+                  onChanged: (value) async {
+                    setState(() {
+                      _notificationsEnabled = value;
+                    });
+
+                    // Salviamo la preferenza
+                    await _saveNotificationPreference(value);
+
+                    // Se l'utente abilita, chiediamo i permessi
+                    if (value) {
+                      await _requestNotificationPermission();
+                    } else {
+                      await _disableNotifications();
+                    }
                   },
                 ),
+                // "Configura Notifiche" disabilitato se _notificationsEnabled == false
                 _buildListTile(
                   'Configura Notifiche',
                   Icons.settings,
-                  onTap: () {
-                    Navigator.pushNamed(context, '/notification_settings');
-                  },
+                  onTap: _notificationsEnabled
+                      ? () {
+                    Navigator.pushNamed(context, '/notification_settings_page');
+                  }
+                      : null, // Se null, il tile è disabilitato
                 ),
               ],
             ),
@@ -151,7 +214,7 @@ class _SettingsPageState extends State<SettingsPage> {
         required List<Widget> content,
       }) {
     return Column(
-      key: ValueKey(sectionIndex), // Chiave unica per ogni sezione
+      key: ValueKey(sectionIndex),
       children: [
         ListTile(
           leading: Icon(icon, color: const Color(0xFF0D47A1)),
@@ -187,19 +250,32 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildListTile(String title, IconData icon, {required VoidCallback onTap}) {
+  /// Ora onTap può essere null, quindi cambiamo la firma:
+  Widget _buildListTile(String title, IconData icon, {required VoidCallback? onTap}) {
+    final bool isDisabled = (onTap == null);
     return ListTile(
-      leading: Icon(icon, color: const Color(0xFF0D47A1)),
+      leading: Icon(
+        icon,
+        // Se disabilitato, l’icona è grigia
+        color: isDisabled ? Colors.grey : const Color(0xFF0D47A1),
+      ),
       title: Text(
         title,
-        style: Theme.of(context).textTheme.bodyLarge,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          // Se disabilitato, il testo è grigio
+          color: isDisabled ? Colors.grey : Colors.black,
+        ),
       ),
-      onTap: onTap,
+      onTap: onTap, // Se null, il tile non risponde ai tap
     );
   }
 
-  Widget _buildSwitchTile(String title, IconData icon,
-      {required bool value, required ValueChanged<bool> onChanged}) {
+  Widget _buildSwitchTile(
+      String title,
+      IconData icon, {
+        required bool value,
+        required ValueChanged<bool> onChanged,
+      }) {
     return ListTile(
       leading: Icon(icon, color: const Color(0xFF0D47A1)),
       title: Text(
@@ -210,6 +286,9 @@ class _SettingsPageState extends State<SettingsPage> {
         value: value,
         onChanged: onChanged,
         activeColor: const Color(0xFF0D47A1),
+        activeTrackColor: Colors.grey[300],
+        inactiveThumbColor: Colors.grey[800],
+        inactiveTrackColor: Colors.grey[200],
       ),
     );
   }
