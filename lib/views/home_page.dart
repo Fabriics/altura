@@ -3,9 +3,8 @@
 import 'dart:async';
 import 'dart:io';
 
-
 import 'package:altura/views/place_details_page.dart';
-import 'package:altura/views/search_page.dart'; // <-- Nuova pagina di ricerca
+import 'package:altura/views/search_page.dart'; // Nuova pagina di ricerca
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -15,11 +14,11 @@ import 'package:location/location.dart';
 import 'package:flutter_open_app_settings/flutter_open_app_settings.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-
 import '../models/place.dart';
 import '../services/auth.dart';
 import '../services/places_service.dart';
 
+// Dropdown predefiniti per la selezione della categoria
 const List<DropdownMenuItem<String>> kCategoryItems = [
   DropdownMenuItem(value: 'pista_decollo', child: Text('Pista di decollo')),
   DropdownMenuItem(value: 'area_volo_libera', child: Text('Area volo libera')),
@@ -35,26 +34,23 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-/// HomePage: Mappa principale con la gestione dei segnaposti (senza barra di ricerca)
+/// HomePage: Mappa principale con gestione dei segnaposto (senza barra di ricerca)
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   GoogleMapController? _mapController;
   final Location _location = Location();
   LocationData? _currentLocation;
 
-  //AppUser? _appUser;
-
   final LatLng _defaultPosition = const LatLng(48.488, 13.678);
-
   bool _hasLocationPermission = false;
   bool _isLoading = true;
 
   StreamSubscription<LocationData>? _locationSubscription;
   late PlacesController _placesController;
 
-  // Posizione al centro della mappa (per il mirino)
+  // Posizione centrale della mappa (usata per il mirino)
   LatLng? _centerPosition;
 
-  // Flag che indica se siamo in "modalità selezione segnaposto"
+  // Flag per la "modalità selezione segnaposto"
   bool _selectingPosition = false;
 
   @override
@@ -67,6 +63,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _initUser();
   }
 
+  /// Inizializza l'utente controllando i dati su Firestore
   Future<void> _initUser() async {
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser == null) {
@@ -81,7 +78,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     if (doc.exists && doc.data() != null) {
       setState(() {
-        //_appUser = AppUser.fromMap(doc.data()!);
+        // _appUser = AppUser.fromMap(doc.data()!);
       });
     } else {
       debugPrint('Il documento utente non esiste o è vuoto');
@@ -97,55 +94,55 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Al ritorno dell'app, reinizializza la posizione
     if (state == AppLifecycleState.resumed) {
       _initLocation();
     }
   }
 
+  /// Funzione di utilità per gestire i casi in cui la localizzazione non sia disponibile
+  void _handleLocationPermissionDenied() {
+    if (!mounted) return;
+    setState(() {
+      _hasLocationPermission = false;
+      _isLoading = false;
+    });
+    _setDefaultLocation();
+  }
+
+  /// Inizializza la localizzazione e gestisce i permessi
   Future<void> _initLocation() async {
-    final localContext = context;
     try {
+      // Verifica che il servizio di localizzazione sia attivo
       if (!await _location.serviceEnabled()) {
         final bool serviceRequested = await _location.requestService();
         if (!serviceRequested) {
-          if (!mounted) return;
-          setState(() {
-            _hasLocationPermission = false;
-            _isLoading = false;
-          });
-          _setDefaultLocation();
+          _handleLocationPermissionDenied();
           return;
         }
       }
 
+      // Controlla e richiede i permessi
       PermissionStatus permission = await _location.hasPermission();
       if (permission == PermissionStatus.deniedForever) {
-        if (!mounted) return;
-        setState(() {
-          _hasLocationPermission = false;
-          _isLoading = false;
-        });
-        _setDefaultLocation();
+        _handleLocationPermissionDenied();
         return;
       } else if (permission == PermissionStatus.denied) {
         permission = await _location.requestPermission();
         if (permission != PermissionStatus.granted) {
-          if (!mounted) return;
-          setState(() {
-            _hasLocationPermission = false;
-            _isLoading = false;
-          });
-          _setDefaultLocation();
+          _handleLocationPermissionDenied();
           return;
         }
       }
 
+      // Sottoscrizione agli aggiornamenti della posizione
       _locationSubscription?.cancel();
       _locationSubscription = _location.onLocationChanged.listen((locData) {
         if (!mounted) return;
         setState(() => _currentLocation = locData);
       });
 
+      // Ottiene la posizione corrente
       final locData = await _location.getLocation();
       if (!mounted) return;
       setState(() {
@@ -155,29 +152,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       });
       _moveCameraToCurrentLocation();
     } on PlatformException catch (e) {
+      // Gestione specifica per l'eccezione di permesso negato in modo permanente
       if (e.code == 'PERMISSION_DENIED_NEVER_ASK') {
-        if (!mounted) return;
-        setState(() {
-          _hasLocationPermission = false;
-          _isLoading = false;
-        });
-        _setDefaultLocation();
+        _handleLocationPermissionDenied();
       } else {
         if (!mounted) return;
         setState(() => _isLoading = false);
-        _showErrorDialog(localContext, "Errore posizione: ${e.message}");
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showErrorDialog(localContext, "Errore posizione: $e");
     }
   }
 
+  /// Imposta la camera sulla posizione di default
   void _setDefaultLocation() {
     _mapController?.animateCamera(CameraUpdate.newLatLng(_defaultPosition));
   }
 
+  /// Muove la camera alla posizione corrente se i permessi sono stati concessi
   void _moveCameraToCurrentLocation() {
     if (_hasLocationPermission && _currentLocation != null) {
       _mapController?.animateCamera(
@@ -188,6 +181,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// Mostra un dialog per aprire le impostazioni della localizzazione
   void showLocationSettingsDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -239,34 +233,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  void _showErrorDialog(BuildContext localContext, String message) {
-    showDialog(
-      context: localContext,
-      builder: (ctx) =>
-          AlertDialog(
-            title: const Text("Errore"),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text("OK", style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
-    );
-  }
-
+  /// Effettua il sign out e torna alla pagina di login
   Future<void> signOut() async {
     await Auth().signOut();
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, '/login_page');
   }
 
-  // Creazione nuovo segnaposto (Wizard 2 step)
   // --------------------------------------------------
-  /// In questa wizard l'utente può selezionare più media (foto e video)
-  Future<Map<String, dynamic>?> _showAddPlaceWizard(
-      BuildContext localContext) async {
+  // Wizard per la creazione di un nuovo segnaposto (2 step)
+  // --------------------------------------------------
+  /// Mostra il wizard per aggiungere un segnaposto, consentendo la selezione di media, titolo, descrizione e categoria
+  Future<Map<String, dynamic>?> _showAddPlaceWizard(BuildContext localContext) async {
     int currentStep = 0;
     String? selectedCategory;
     List<File> chosenMedia = [];
@@ -282,23 +260,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setStateSB) {
+            // Funzione per passare al passo successivo (step 1 -> step 2)
             void goNextStep() {
               if (currentStep == 0 && selectedCategory == null) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Seleziona una categoria')));
+                ScaffoldMessenger.of(ctx)
+                    .showSnackBar(const SnackBar(content: Text('Seleziona una categoria')));
                 return;
               }
               setStateSB(() => currentStep = 1);
             }
 
+            // Torna indietro (step 2 -> step 1)
             void goPreviousStep() {
               setStateSB(() => currentStep = 0);
             }
 
+            // Conclude il wizard e restituisce i dati inseriti
             void finishWizard() {
               if (title == null || title!.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Inserisci un titolo')));
+                ScaffoldMessenger.of(ctx)
+                    .showSnackBar(const SnackBar(content: Text('Inserisci un titolo')));
                 return;
               }
               Navigator.of(ctx).pop({
@@ -307,32 +288,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 'title': title,
                 'description': description,
               });
-
             }
 
-            final stepLabel = (currentStep == 0)
-                ? 'Step 1 di 2'
-                : 'Step 2 di 2';
+            final stepLabel = (currentStep == 0) ? 'Step 1 di 2' : 'Step 2 di 2';
 
             return Padding(
               padding: EdgeInsets.only(
                 left: 16,
                 right: 16,
                 top: 16,
-                bottom: MediaQuery
-                    .of(ctx)
-                    .viewInsets
-                    .bottom + 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
               ),
               child: SingleChildScrollView(
                 child: SizedBox(
-                  height: MediaQuery
-                      .of(ctx)
-                      .size
-                      .height * 0.7,
+                  height: MediaQuery.of(ctx).size.height * 0.7,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // Header con indicazione dello step corrente
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -344,26 +317,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             )
                           else
                             const SizedBox(width: 48),
-                          Text(stepLabel, style: const TextStyle(
-                              fontSize: 14, color: Colors.grey)),
+                          Text(stepLabel,
+                              style: const TextStyle(fontSize: 14, color: Colors.grey)),
                           const SizedBox(width: 48),
                         ],
                       ),
                       const SizedBox(height: 8),
                       if (currentStep == 0) ...[
+                        // Step 1: Selezione della categoria
                         Text(
                           'Seleziona la Categoria',
-                          style: Theme
-                              .of(localContext)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(
+                          style: Theme.of(localContext).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             fontSize: 20,
-                            color: Theme
-                                .of(localContext)
-                                .colorScheme
-                                .primary,
+                            color: Theme.of(localContext).colorScheme.primary,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -383,49 +350,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           child: Column(
                             children: [
                               RadioListTile(
-                                title: const Text('Pista di decollo',
-                                    style: TextStyle(color: Colors.black)),
+                                title: const Text('Pista di decollo', style: TextStyle(color: Colors.black)),
                                 activeColor: Colors.blue[900],
                                 value: 'pista_decollo',
                                 groupValue: selectedCategory,
-                                onChanged: (val) =>
-                                    setStateSB(() => selectedCategory = val),
+                                onChanged: (val) => setStateSB(() => selectedCategory = val),
                               ),
                               RadioListTile(
-                                title: const Text('Area volo libera',
-                                    style: TextStyle(color: Colors.black)),
+                                title: const Text('Area volo libera', style: TextStyle(color: Colors.black)),
                                 activeColor: Colors.blue[900],
                                 value: 'area_volo_libera',
                                 groupValue: selectedCategory,
-                                onChanged: (val) =>
-                                    setStateSB(() => selectedCategory = val),
+                                onChanged: (val) => setStateSB(() => selectedCategory = val),
                               ),
                               RadioListTile(
-                                title: const Text('Area soggetta a restrizioni',
-                                    style: TextStyle(color: Colors.black)),
+                                title: const Text('Area soggetta a restrizioni', style: TextStyle(color: Colors.black)),
                                 activeColor: Colors.blue[900],
                                 value: 'area_restrizioni',
                                 groupValue: selectedCategory,
-                                onChanged: (val) =>
-                                    setStateSB(() => selectedCategory = val),
+                                onChanged: (val) => setStateSB(() => selectedCategory = val),
                               ),
                               RadioListTile(
-                                title: const Text('Punto di ricarica',
-                                    style: TextStyle(color: Colors.black)),
+                                title: const Text('Punto di ricarica', style: TextStyle(color: Colors.black)),
                                 activeColor: Colors.blue[900],
                                 value: 'punto_ricarica',
                                 groupValue: selectedCategory,
-                                onChanged: (val) =>
-                                    setStateSB(() => selectedCategory = val),
+                                onChanged: (val) => setStateSB(() => selectedCategory = val),
                               ),
                               RadioListTile(
-                                title: const Text('Altro',
-                                    style: TextStyle(color: Colors.black)),
+                                title: const Text('Altro', style: TextStyle(color: Colors.black)),
                                 activeColor: Colors.blue[900],
                                 value: 'altro',
                                 groupValue: selectedCategory,
-                                onChanged: (val) =>
-                                    setStateSB(() => selectedCategory = val),
+                                onChanged: (val) => setStateSB(() => selectedCategory = val),
                               ),
                             ],
                           ),
@@ -438,10 +395,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               onPressed: goNextStep,
                               style: ElevatedButton.styleFrom(
                                 foregroundColor: Colors.white,
-                                backgroundColor: Theme
-                                    .of(localContext)
-                                    .colorScheme
-                                    .primary,
+                                backgroundColor: Theme.of(localContext).colorScheme.primary,
                               ),
                               child: const Text(
                                 'Prossimo',
@@ -454,184 +408,170 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
                           ],
                         ),
-                      ] else
-                        ...[
-                          Text(
-                            'Carica i dettagli',
-                            style: Theme
-                                .of(localContext)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                              color: Theme
-                                  .of(localContext)
-                                  .colorScheme
-                                  .primary,
-                            ),
+                      ] else ...[
+                        // Step 2: Caricamento dettagli e media
+                        Text(
+                          'Carica i dettagli',
+                          style: Theme.of(localContext).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                            color: Theme.of(localContext).colorScheme.primary,
                           ),
-                          const SizedBox(height: 12),
-                          // Sezione per aggiungere media multipli
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.blue[900],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () async {
-                                // Si assume che pickMedia() restituisca una List<File>
-                                final media = await _placesController
-                                    .pickMedia();
-                                if (media != null && media.isNotEmpty) {
-                                  setStateSB(() {
-                                    chosenMedia.addAll(media);
-                                  });
-                                }
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                        Icons.camera_alt, color: Colors.white),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      (chosenMedia.isEmpty)
-                                          ? 'Carica Foto/Video'
-                                          : 'Aggiungi altri media',
-                                      style: const TextStyle(
-                                          color: Colors.white),
-                                    ),
-                                  ],
-                                ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.blue[900],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () async {
+                              final media = await _placesController.pickMedia();
+                              if (media != null && media.isNotEmpty) {
+                                setStateSB(() {
+                                  chosenMedia.addAll(media);
+                                });
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.camera_alt, color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    (chosenMedia.isEmpty)
+                                        ? 'Carica Foto/Video'
+                                        : 'Aggiungi altri media',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                          if (chosenMedia.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              height: 100,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: chosenMedia.length,
-                                itemBuilder: (context, index) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.file(
-                                        chosenMedia[index],
-                                        height: 100,
-                                        width: 100,
-                                        fit: BoxFit.cover,
+                        ),
+                        if (chosenMedia.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 100,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: chosenMedia.length,
+                              itemBuilder: (context, index) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.file(
+                                          chosenMedia[index],
+                                          height: 100,
+                                          width: 100,
+                                          fit: BoxFit.cover,
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
+                                      Positioned(
+                                        top: 0,
+                                        right: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.grey,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: IconButton(
+                                            icon: const Icon(Icons.close, color: Colors.black),
+                                            onPressed: () {
+                                              setStateSB(() {
+                                                chosenMedia.removeAt(index);
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        // Campo per il Titolo
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.all(6),
+                          child: TextField(
+                            onChanged: (val) => title = val,
+                            style: const TextStyle(color: Colors.white),
+                            textInputAction: TextInputAction.next,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.grey[200],
+                              labelText: "Titolo",
+                              hintText: "Inserisci titolo",
+                              labelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
+                              hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Campo per la Descrizione
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.all(8),
+                          child: TextField(
+                            onChanged: (val) => description = val,
+                            style: const TextStyle(color: Colors.white),
+                            textInputAction: TextInputAction.next,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.grey[200],
+                              labelText: "Descrizione",
+                              hintText: "Inserisci descrizione",
+                              labelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
+                              hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: finishWizard,
+                              style: ElevatedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                backgroundColor: Theme.of(localContext).colorScheme.primary,
+                              ),
+                              child: const Text(
+                                'Carica',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
-                          const SizedBox(height: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.all(6),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 6),
-                                TextField(
-                                  onChanged: (val) => title = val,
-                                  style: const TextStyle(color: Colors.white),
-                                  textInputAction: TextInputAction.next,
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: Colors.grey[200],
-                                    labelText: "Titolo",
-                                    hintText: "Inserisci titolo",
-                                    labelStyle: TextStyle(color: Theme
-                                        .of(context)
-                                        .colorScheme
-                                        .primary),
-                                    hintStyle: TextStyle(color: Theme
-                                        .of(context)
-                                        .colorScheme
-                                        .primary),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 30),
-                                TextField(
-                                  onChanged: (val) => description = val,
-                                  style: const TextStyle(color: Colors.white),
-                                  textInputAction: TextInputAction.next,
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: Colors.grey[200],
-                                    labelText: "Descrizione",
-                                    hintText: "Inserisci descrizione",
-                                    labelStyle: TextStyle(color: Theme
-                                        .of(context)
-                                        .colorScheme
-                                        .primary),
-                                    hintStyle: TextStyle(color: Theme
-                                        .of(context)
-                                        .colorScheme
-                                        .primary),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Spacer(),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              ElevatedButton(
-                                onPressed: finishWizard,
-                                style: ElevatedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  backgroundColor: Theme
-                                      .of(localContext)
-                                      .colorScheme
-                                      .primary,
-                                ),
-                                child: const Text(
-                                  'Carica',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -644,15 +584,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   // --------------------------------------------------
-  // Funzioni di aggiunta Marker
+  // Funzioni per l'aggiunta di Marker
   // --------------------------------------------------
-  // Aggiungi marker alla posizione
+  /// Aggiunge un marker alla posizione selezionata
   Future<void> _addMarkerAtPosition(LatLng latLng) async {
     final localContext = context;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showErrorDialog(
-          localContext, 'Devi essere loggato per creare un segnaposto.');
+      debugPrint("Utente non loggato");
       return;
     }
 
@@ -661,7 +600,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
 
-    // Ottieni le informazioni dal wizard
+    // Ottiene i dati inseriti dall'utente tramite il wizard
     final info = await _showAddPlaceWizard(localContext);
     if (info == null) return;
 
@@ -670,54 +609,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final title = info['title'] as String? ?? 'Segnaposto';
     final description = info['description'] as String? ?? '';
 
-    // Aggiungi il nuovo segnaposto
-    final newPlace = await _placesController.addPlace(
-      latitude: latLng.latitude,
-      longitude: latLng.longitude,
-      userId: user.uid,
-      category: category,
-      title: title,
-      description: description,
-      mediaFiles: mediaFiles, // Passiamo la lista di media
-    );
-
-    // Salva il segnaposto nell'utente
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-      'uploadedPlaces': FieldValue.arrayUnion([newPlace.id]),
-    });
-
-    // Ricarica l'utente
-    await _initUser();
-
-    // Muovi la mappa al nuovo marker
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLng(LatLng(newPlace.latitude, newPlace.longitude)),
-    );
-  }
-
-  Future<void> _addMarker() async {
-    final localContext = context;
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      _showErrorDialog(
-          localContext, 'Devi essere loggato per creare un segnaposto.');
-      return;
-    }
-    if (!_hasLocationPermission || _currentLocation == null) {
-      showLocationSettingsDialog(context);
-      return;
-    }
-
-    final info = await _showAddPlaceWizard(localContext);
-    if (info == null) return;
-
-    final category = info['category'] as String? ?? 'altro';
-    final mediaFiles = info['media'] as List<File>? ?? [];
-    final title = info['title'] as String? ?? 'Segnaposto';
-    final description = info['description'] as String? ?? '';
-
-    final latLng = LatLng(
-        _currentLocation!.latitude!, _currentLocation!.longitude!);
+    // Aggiunge il nuovo segnaposto
     final newPlace = await _placesController.addPlace(
       latitude: latLng.latitude,
       longitude: latLng.longitude,
@@ -728,10 +620,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       mediaFiles: mediaFiles,
     );
 
+    // Aggiorna il documento utente con il nuovo segnaposto
     await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
       'uploadedPlaces': FieldValue.arrayUnion([newPlace.id]),
     });
 
+    // Ricarica i dati utente e sposta la mappa sul nuovo marker
     await _initUser();
     _mapController?.animateCamera(
       CameraUpdate.newLatLng(LatLng(newPlace.latitude, newPlace.longitude)),
@@ -739,14 +633,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   // --------------------------------------------------
-  // Visualizzazione dettagli (preview bottom sheet)
+  // Visualizzazione dettagli segnaposto (preview bottom sheet)
   // --------------------------------------------------
+  /// Mostra i dettagli del segnaposto in un bottom sheet
   void _showPlaceDetails(Place place) async {
     final localContext = context;
     String username = 'Sconosciuto';
     try {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(
-          place.userId).get();
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(place.userId)
+          .get();
       if (userDoc.exists) {
         final data = userDoc.data();
         if (data != null) {
@@ -756,9 +653,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Errore username: $e');
     }
-    final photoCount = (place.mediaFiles != null)
-        ? place.mediaFiles!.length
-        : 1;
+    final photoCount = (place.mediaFiles != null) ? place.mediaFiles!.length : 1;
 
     if (!mounted) return;
     showModalBottomSheet(
@@ -770,15 +665,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         return Container(
           height: 400,
           padding: const EdgeInsets.all(16),
-          child: _buildFixedPlaceCard(
-              place, username, photoCount, bottomSheetCtx),
+          child: _buildFixedPlaceCard(place, username, photoCount, bottomSheetCtx),
         );
       },
     );
   }
 
-  /// La card di preview del segnaposto.
-  /// Se l'utente tocca il banner (area principale) viene chiuso il bottom sheet e si apre la pagina di dettaglio.
+  /// Costruisce la card di preview del segnaposto
   Widget _buildFixedPlaceCard(Place place, String username, int photoCount, BuildContext bottomSheetCtx) {
     return GestureDetector(
       onTap: () {
@@ -793,7 +686,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Banner: se il segnaposto contiene più media, mostriamo un carousel (PageView)
+          // Banner: se il segnaposto contiene più media, mostra un carousel (PageView)
           SizedBox(
             height: 150,
             width: double.infinity,
@@ -802,11 +695,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           const SizedBox(height: 8),
           Text(
             place.name,
-            style: const TextStyle(
-                fontSize: 18, color: Colors.blue, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 18, color: Colors.blue, fontWeight: FontWeight.bold),
           ),
-          Text(username,
-              style: const TextStyle(fontSize: 14, color: Colors.black54)),
+          Text(username, style: const TextStyle(fontSize: 14, color: Colors.black54)),
           const SizedBox(height: 8),
           if (place.description != null && place.description!.isNotEmpty)
             Text(place.description!, style: const TextStyle(fontSize: 14)),
@@ -816,8 +707,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               const Icon(Icons.location_on, size: 18, color: Colors.grey),
               const SizedBox(width: 4),
               Text(
-                '${place.latitude.toStringAsFixed(5)}, ${place.longitude
-                    .toStringAsFixed(5)}',
+                '${place.latitude.toStringAsFixed(5)}, ${place.longitude.toStringAsFixed(5)}',
                 style: const TextStyle(fontSize: 13, color: Colors.grey),
               ),
             ],
@@ -837,8 +727,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Text('$photoCount di $photoCount',
-                  style: const TextStyle(fontSize: 13, color: Colors.grey)),
+              Text('$photoCount di $photoCount', style: const TextStyle(fontSize: 13, color: Colors.grey)),
               const SizedBox(width: 12),
               if (place.userId == FirebaseAuth.instance.currentUser?.uid) ...[
                 IconButton(
@@ -859,9 +748,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  /// Se il segnaposto contiene più media, li visualizziamo in un PageView
+  /// Visualizza le immagini del segnaposto: usa un PageView se ci sono più media, altrimenti mostra un placeholder
   Widget _buildPlaceImage(Place place) {
-    // Si assume che il modello Place ora contenga il campo "mediaFiles" (List<File>?) e/o "mediaUrls" (List<String>?)
     if (place.mediaFiles != null && place.mediaFiles!.isNotEmpty) {
       return PageView.builder(
         itemCount: place.mediaFiles!.length,
@@ -892,24 +780,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  Widget _buildCategoryIcon(String category) {
-    switch (category) {
-      case 'pista_decollo':
-        return const Icon(Icons.flight_takeoff, color: Colors.red);
-      case 'area_volo_libera':
-        return const Icon(Icons.flight, color: Colors.green);
-      case 'area_restrizioni':
-        return const Icon(Icons.block, color: Colors.orange);
-      case 'punto_ricarica':
-        return const Icon(Icons.battery_full, color: Colors.blue);
-      default:
-        return const Icon(Icons.place, color: Colors.grey);
-    }
-  }
-
   // --------------------------------------------------
-  // Funzioni di modifica e cancellazione segnaposto
+  // Funzioni per la modifica e cancellazione del segnaposto
   // --------------------------------------------------
+  /// Modifica il segnaposto esistente aprendo un dialog di editing
   Future<void> _editPlace(Place place, BuildContext boxContext) async {
     Navigator.of(boxContext).pop();
 
@@ -932,27 +806,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
+  /// Cancella il segnaposto dopo conferma
   Future<void> _deletePlace(Place place, BuildContext boxContext) async {
     Navigator.of(boxContext).pop();
     final localContext = context;
     final confirm = await showDialog<bool>(
       context: localContext,
-      builder: (ctx) =>
-          AlertDialog(
-            title: const Text('Conferma Eliminazione'),
-            content: Text('Eliminare il segnaposto "${place.name}"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Annulla'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text(
-                    'Elimina', style: TextStyle(color: Colors.red)),
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('Conferma Eliminazione'),
+        content: Text('Eliminare il segnaposto "${place.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annulla'),
           ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Elimina', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
     if (confirm == true) {
       await _placesController.deletePlace(place.id);
@@ -961,14 +834,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   /// Dialog per modificare un segnaposto esistente (supporta più media)
-  Future<Map<String, dynamic>?> _askEditPlaceDialog(BuildContext localContext,
-      Place place) async {
+  Future<Map<String, dynamic>?> _askEditPlaceDialog(BuildContext localContext, Place place) async {
     String selectedCategory = place.category;
     List<File> pickedMedia = [];
 
     final titleController = TextEditingController(text: place.name);
-    final descriptionController = TextEditingController(
-        text: place.description);
+    final descriptionController = TextEditingController(text: place.description);
 
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: localContext,
@@ -982,10 +853,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 left: 16,
                 right: 16,
                 top: 16,
-                bottom: MediaQuery
-                    .of(ctx)
-                    .viewInsets
-                    .bottom + 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -993,14 +861,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   children: [
                     const Text(
                       'Modifica Segnaposto',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight
-                          .bold),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Text('Categoria: ',
-                            style: TextStyle(fontSize: 18)),
+                        const Text('Categoria: ', style: TextStyle(fontSize: 18)),
                         DropdownButton<String>(
                           value: selectedCategory,
                           items: kCategoryItems,
@@ -1020,8 +886,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Titolo', style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w500)),
+                          const Text('Titolo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
                           TextField(
                             controller: titleController,
                             decoration: InputDecoration(
@@ -1043,8 +908,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Descrizione', style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w500)),
+                          const Text('Descrizione', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
                           TextField(
                             controller: descriptionController,
                             maxLines: 3,
@@ -1072,16 +936,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       },
                       style: ElevatedButton.styleFrom(
                         foregroundColor: Colors.white,
-                        backgroundColor: Theme
-                            .of(localContext)
-                            .colorScheme
-                            .primary,
+                        backgroundColor: Theme.of(localContext).colorScheme.primary,
                       ),
                       child: const Text(
-                          'Seleziona Nuovi Media', style: TextStyle(
+                        'Seleziona Nuovi Media',
+                        style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
-                          fontWeight: FontWeight.bold)),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     if (pickedMedia.isNotEmpty) ...[
                       const SizedBox(height: 8),
@@ -1113,8 +977,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(ctx).pop(null),
-                          child: const Text('Annulla', style: TextStyle(
-                              color: Colors.red, fontSize: 18)),
+                          child: const Text('Annulla', style: TextStyle(color: Colors.red, fontSize: 18)),
                         ),
                         TextButton(
                           onPressed: () {
@@ -1125,8 +988,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               'media': pickedMedia,
                             });
                           },
-                          child: const Text(
-                              'Salva', style: TextStyle(fontSize: 18)),
+                          child: const Text('Salva', style: TextStyle(fontSize: 18)),
                         ),
                       ],
                     ),
@@ -1144,6 +1006,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return result;
   }
 
+  /// Apre la pagina di ricerca e aggiorna la mappa in base al risultato
   void _openSearchPage() async {
     final result = await Navigator.push(
       context,
@@ -1156,9 +1019,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       _mapController?.animateCamera(
         CameraUpdate.newLatLng(LatLng(lat, lng)),
-      ); // Funzione che ora implementiamo
+      );
       setState(() {
-        // Puoi scegliere se pulire i marker precedenti o meno
+        // Aggiorna i marker: qui si sceglie se sostituire quelli esistenti
         _placesController.markers.clear();
         _placesController.markers.add(
           Marker(
@@ -1172,7 +1035,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  /// Costruisce la mappa
+  /// Costruisce la mappa GoogleMap con gestione dei marker e della posizione
   Widget _buildGoogleMap() {
     return GoogleMap(
       onMapCreated: (controller) => _mapController = controller,
@@ -1207,19 +1070,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Scaffold(
       body: Stack(
         children: [
+          // Visualizza la mappa o il caricamento
           if (_isLoading)
             const Center(child: CircularProgressIndicator())
           else
             _buildGoogleMap(),
 
-          // Pulsante di ricerca (in alto a destra)
+          // Pulsante di ricerca in alto a destra
           Positioned(
             top: 80,
             right: 16,
             child: GestureDetector(
-              onTap: () {
-                _openSearchPage();
-              },
+              onTap: _openSearchPage,
               child: Container(
                 width: 56,
                 height: 56,
@@ -1239,7 +1101,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ),
 
-          // Pulsanti floating in basso a destra
+          // Pulsanti flottanti in basso a destra
           Positioned(
             bottom: 130,
             right: 16,
@@ -1255,16 +1117,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       showLocationSettingsDialog(context);
                     }
                   },
-                  backgroundColor: Theme
-                      .of(context)
-                      .colorScheme
-                      .onPrimary,
+                  backgroundColor: Theme.of(context).colorScheme.onPrimary,
                   child: Icon(
                     Icons.my_location,
-                    color: Theme
-                        .of(context)
-                        .colorScheme
-                        .primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1314,21 +1170,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ),
 
-          // Visualizzazione del mirino
+          // Mirino visualizzato quando si è in modalità selezione posizione
           if (!_isLoading && _selectingPosition)
             Positioned(
-              top: MediaQuery
-                  .of(context)
-                  .size
-                  .height * 0.4, // Posizione del mirino
-              left: MediaQuery
-                  .of(context)
-                  .size
-                  .width * 0.4, // Posizione del mirino
+              top: MediaQuery.of(context).size.height * 0.4,
+              left: MediaQuery.of(context).size.width * 0.4,
               child: const Icon(
                 Icons.location_on,
                 size: 48,
-                color: Colors.redAccent, // Colore del mirino
+                color: Colors.redAccent,
               ),
             ),
         ],
