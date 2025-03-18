@@ -107,4 +107,10 @@ class Place {
       mediaFiles: mediaFiles ?? this.mediaFiles,
     );
   }
+
+  int get totalPhotos {
+    final int localCount = mediaFiles?.length ?? 0;
+    final int remoteCount = mediaUrls?.length ?? 0;
+    return localCount + remoteCount;
+  }
 }

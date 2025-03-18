@@ -26,6 +26,8 @@ class PlacesController extends ChangeNotifier {
   late BitmapDescriptor _iconOther;
   bool _iconsLoaded = false;
 
+
+
   PlacesController() {
     //_loadCustomIcons();
     loadPlacesFromFirestore();
@@ -252,6 +254,7 @@ class PlacesController extends ChangeNotifier {
         markerId: MarkerId(place.id),
         position: LatLng(place.latitude, place.longitude),
         icon: BitmapDescriptor.defaultMarker,
+        anchor: Offset(0.5, 1.05),
         infoWindow: InfoWindow(
           title: place.name,
           snippet: place.description ?? 'Nessuna descrizione',

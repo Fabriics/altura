@@ -66,17 +66,17 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF02398E),
         elevation: 0,
         title: Text(
           'Impostazioni',
           style: Theme.of(context)
               .textTheme
               .bodyLarge
-              ?.copyWith(color: Colors.black, fontWeight: FontWeight.bold),
+              ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         child: Column(

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 /// Puoi sostituire [rulesByCountry] con una struttura dati dinamica
 /// (es. caricata da Firestore, JSON locale o API esterna).
 class RulesPage extends StatefulWidget {
-  const RulesPage({Key? key}) : super(key: key);
+  const RulesPage({super.key});
 
   @override
   State<RulesPage> createState() => _RulesPageState();
@@ -43,7 +43,7 @@ class _RulesPageState extends State<RulesPage> {
           final rules = rulesByCountry[country];
 
           return ExpansionTile(
-            title: Text(country, style: const TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(country, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

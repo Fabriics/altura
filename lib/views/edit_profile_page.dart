@@ -6,7 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 class EditProfilePage extends StatefulWidget {
-  const EditProfilePage({Key? key}) : super(key: key);
+  const EditProfilePage({super.key});
 
   @override
   State<EditProfilePage> createState() => _EditProfilePageState();
@@ -66,7 +66,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           (data['flightExperience']?.toString() ?? '');
           _profileImageUrl = data['profileImageUrl'];
 
-          // Se esiste la lista droni salvata, la aggiungo al set
+          // Se esiste la lista droni salvata, la aggiungiamo al set
           if (data['drones'] != null) {
             final List<dynamic> droneList = data['drones'];
             for (var d in droneList) {
@@ -90,9 +90,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         final uid = FirebaseAuth.instance.currentUser?.uid;
         if (uid == null) return;
 
-        File imageFile = File(pickedFile.path);
+        final File imageFile = File(pickedFile.path);
 
-        // Carica l'immagine su Firebase Storage
+        // Carichiamo l'immagine su Firebase Storage
         final storageRef = FirebaseStorage.instance
             .ref()
             .child('profile_images')
@@ -102,7 +102,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         final snapshot = await uploadTask;
         final downloadUrl = await snapshot.ref.getDownloadURL();
 
-        // Aggiorna l'URL dell'immagine in Firestore
+        // Aggiorniamo l'URL dell'immagine in Firestore
         await FirebaseFirestore.instance.collection('users').doc(uid).update({
           'profileImageUrl': downloadUrl,
         });
@@ -209,7 +209,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text('Modifica Profilo'),
-
         centerTitle: true,
         actions: [
           IconButton(
@@ -219,7 +218,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               if (_formKey.currentState?.validate() ?? false) {
                 await _updateProfile();
               } else {
-                // Se vuoi gestire form non validi
+                // Gestione form non validi (opzionale)
               }
             },
           )
@@ -239,11 +238,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       CircleAvatar(
                         radius: 60,
                         backgroundColor: Colors.grey[300],
-                        backgroundImage:
-                        (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
+                        backgroundImage: (_profileImageUrl != null &&
+                            _profileImageUrl!.isNotEmpty)
                             ? NetworkImage(_profileImageUrl!)
                             : null,
-                        child: (_profileImageUrl == null)
+                        child: (_profileImageUrl == null ||
+                            _profileImageUrl!.isEmpty)
                             ? Icon(
                           Icons.person,
                           size: 60,
@@ -309,12 +309,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   children: _selectedDrones.map((drone) {
                     return Chip(
                       label: Text(drone),
-                      deleteIcon: Icon(Icons.close, color: theme.colorScheme.primary),
+                      deleteIcon: Icon(Icons.close,
+                          color: theme.colorScheme.primary),
                       onDeleted: () {
                         setState(() => _selectedDrones.remove(drone));
                       },
                       backgroundColor: Colors.grey[200],
-                      labelStyle: TextStyle(color: theme.colorScheme.primary),
+                      labelStyle:
+                      TextStyle(color: theme.colorScheme.primary),
                     );
                   }).toList(),
                 ),
@@ -400,7 +402,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  // Costruisce un TextFormField
+  /// Costruisce un TextFormField generico
   Widget _buildTextField({
     required TextEditingController controller,
     required String labelText,

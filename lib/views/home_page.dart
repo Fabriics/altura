@@ -17,6 +17,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../models/place.dart';
 import '../services/auth.dart';
 import '../services/places_service.dart';
+import 'edit_place_page.dart';
 
 // Dropdown predefiniti per la selezione della categoria
 const List<DropdownMenuItem<String>> kCategoryItems = [
@@ -34,7 +35,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-/// HomePage: Mappa principale con gestione dei segnaposto (senza barra di ricerca)
+/// HomePage: Mappa principale con gestione dei segnaposto
+/// (la BottomNavigationBar è gestita in un altro file, ad es. main_screen.dart)
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   GoogleMapController? _mapController;
   final Location _location = Location();
@@ -52,6 +54,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   // Flag per la "modalità selezione segnaposto"
   bool _selectingPosition = false;
+
+  // Variabili di stato per la Card del segnaposto selezionato
+  Place? _selectedPlace;
+  String _selectedUsername = 'Sconosciuto';
+  int _selectedPhotoCount = 0;
 
   @override
   void initState() {
@@ -78,6 +85,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     if (doc.exists && doc.data() != null) {
       setState(() {
+        // Esempio: carica dati utente
         // _appUser = AppUser.fromMap(doc.data()!);
       });
     } else {
@@ -411,7 +419,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ] else ...[
                         // Step 2: Caricamento dettagli e media
                         Text(
-                          'Carica i dettagli',
+                          'Inserisci i dettagli',
                           style: Theme.of(localContext).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             fontSize: 20,
@@ -442,7 +450,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   const SizedBox(width: 8),
                                   Text(
                                     (chosenMedia.isEmpty)
-                                        ? 'Carica Foto/Video'
+                                        ? 'Inserisci Foto/Video'
                                         : 'Aggiungi altri media',
                                     style: const TextStyle(color: Colors.white),
                                   ),
@@ -508,7 +516,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           padding: const EdgeInsets.all(6),
                           child: TextField(
                             onChanged: (val) => title = val,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: Theme.of(context).colorScheme.primary),
                             textInputAction: TextInputAction.next,
                             decoration: InputDecoration(
                               filled: true,
@@ -534,8 +542,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           padding: const EdgeInsets.all(8),
                           child: TextField(
                             onChanged: (val) => description = val,
-                            style: const TextStyle(color: Colors.white),
-                            textInputAction: TextInputAction.next,
+                            style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                            keyboardType: TextInputType.multiline,
+                            minLines: 3, // Mostra almeno 3 righe
+                            maxLines: 10,
+                            textInputAction: TextInputAction.newline,
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[200],
@@ -550,6 +561,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
                           ),
                         ),
+
                         const Spacer(),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -632,13 +644,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  // --------------------------------------------------
-  // Visualizzazione dettagli segnaposto (preview bottom sheet)
-  // --------------------------------------------------
-  /// Mostra i dettagli del segnaposto in un bottom sheet
+// --------------------------------------------------
+// Visualizzazione dettagli segnaposto con Card fissa
+// --------------------------------------------------
+
+  /// Quando un marker viene toccato, carichiamo i dettagli e settiamo la card
   void _showPlaceDetails(Place place) async {
-    final localContext = context;
     String username = 'Sconosciuto';
+
     try {
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -653,102 +666,139 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Errore username: $e');
     }
+
     final photoCount = (place.mediaFiles != null) ? place.mediaFiles!.length : 1;
 
-    if (!mounted) return;
-    showModalBottomSheet(
-      context: localContext,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (bottomSheetCtx) {
-        return Container(
-          height: 400,
-          padding: const EdgeInsets.all(16),
-          child: _buildFixedPlaceCard(place, username, photoCount, bottomSheetCtx),
-        );
-      },
-    );
+    // Aggiorniamo lo stato per far comparire la Card in basso
+    setState(() {
+      _selectedPlace = place;
+      _selectedUsername = username;
+      _selectedPhotoCount = photoCount;
+    });
   }
 
-  /// Costruisce la card di preview del segnaposto
-  Widget _buildFixedPlaceCard(Place place, String username, int photoCount, BuildContext bottomSheetCtx) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(bottomSheetCtx).pop();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PlaceDetailsPage(place: place),
-          ),
-        );
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Banner: se il segnaposto contiene più media, mostra un carousel (PageView)
-          SizedBox(
-            height: 150,
-            width: double.infinity,
-            child: _buildPlaceImage(place),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            place.name,
-            style: const TextStyle(fontSize: 18, color: Colors.blue, fontWeight: FontWeight.bold),
-          ),
-          Text(username, style: const TextStyle(fontSize: 14, color: Colors.black54)),
-          const SizedBox(height: 8),
-          if (place.description != null && place.description!.isNotEmpty)
-            Text(place.description!, style: const TextStyle(fontSize: 14)),
-          const SizedBox(height: 6),
-          Row(
+  Widget _buildFixedPlaceCard(Place place, String username, int photoCount) {
+    final bool isOwner = place.userId == FirebaseAuth.instance.currentUser?.uid;
+    final int totalPhotos = place.totalPhotos; // mediaFiles + mediaUrls
+
+    return Card(
+      // Colore blu scuro come richiesto
+      color: const Color(0xFF02398E),
+      margin: const EdgeInsets.all(8.0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      elevation: 4.0,
+      child: InkWell(
+        onTap: () {
+          // Vai alla pagina di dettaglio
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PlaceDetailsPage(place: place),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            // Lasciamo che la card si adatti all’altezza del contenuto
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.location_on, size: 18, color: Colors.grey),
-              const SizedBox(width: 4),
+              // 1) Immagine con bordi arrotondati
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  height: 120, // Altezza fissa per l'immagine
+                  width: double.infinity,
+                  child: _buildPlaceImage(place),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // 2) Nome del luogo (titolo)
               Text(
-                '${place.latitude.toStringAsFixed(5)}, ${place.longitude.toStringAsFixed(5)}',
-                style: const TextStyle(fontSize: 13, color: Colors.grey),
+                place.name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: Colors.white, // Testo bianco per risaltare su sfondo blu
+                  fontWeight: FontWeight.bold,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                maxLines: 1,
+              ),
+
+              // 3) Descrizione (opzionale)
+              if (place.description != null && place.description!.isNotEmpty)
+                Text(
+                  place.description!,
+                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+
+              // 4) Se l’utente è proprietario, icone di modifica/eliminazione
+              if (isOwner)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        onPressed: () => _editPlace(place, context),
+                        icon: const Icon(Icons.edit),
+                        color: Colors.white70,
+                      ),
+                      IconButton(
+                        onPressed: () => _deletePlace(place, context),
+                        icon: const Icon(Icons.delete),
+                        color: Colors.redAccent,
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Spacer per spingere data e foto in basso a destra
+              const Spacer(),
+
+              // 5) In fondo a destra: data di creazione e conteggio foto
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Data di creazione
+                  if (place.createdAt != null) ...[
+                    const Icon(Icons.timer, size: 18, color: Colors.white70),
+                    const SizedBox(width: 4),
+                    Text(
+                      timeago.format(place.createdAt!),
+                      style: const TextStyle(fontSize: 13, color: Colors.white70),
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                  // Icona foto + conteggio
+                  const Icon(
+                    Icons.camera_alt,
+                    size: 16,
+                    color: Colors.white70,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$totalPhotos',
+                    style: const TextStyle(fontSize: 13, color: Colors.white70),
+                  ),
+                ],
               ),
             ],
           ),
-          if (place.createdAt != null)
-            Row(
-              children: [
-                const Icon(Icons.timer, size: 18, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(
-                  'Caricato ${timeago.format(place.createdAt!)}',
-                  style: const TextStyle(fontSize: 13, color: Colors.grey),
-                ),
-              ],
-            ),
-          const Spacer(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text('$photoCount di $photoCount', style: const TextStyle(fontSize: 13, color: Colors.grey)),
-              const SizedBox(width: 12),
-              if (place.userId == FirebaseAuth.instance.currentUser?.uid) ...[
-                IconButton(
-                  onPressed: () => _editPlace(place, bottomSheetCtx),
-                  icon: const Icon(Icons.edit),
-                  color: Colors.black54,
-                ),
-                IconButton(
-                  onPressed: () => _deletePlace(place, bottomSheetCtx),
-                  icon: const Icon(Icons.delete),
-                  color: Colors.red,
-                ),
-              ]
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  /// Visualizza le immagini del segnaposto: usa un PageView se ci sono più media, altrimenti mostra un placeholder
+
+
+  /// Se ci sono molte immagini, usa un PageView
   Widget _buildPlaceImage(Place place) {
     if (place.mediaFiles != null && place.mediaFiles!.isNotEmpty) {
       return PageView.builder(
@@ -785,17 +835,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // --------------------------------------------------
   /// Modifica il segnaposto esistente aprendo un dialog di editing
   Future<void> _editPlace(Place place, BuildContext boxContext) async {
-    Navigator.of(boxContext).pop();
 
-    final localContext = context;
-    final info = await _askEditPlaceDialog(localContext, place);
-    if (info == null) return;
+    // Naviga verso la pagina di editing e attendi il risultato
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => EditPlacePage(place: place),
+      ),
+    );
 
-    final newCategory = info['category'] as String;
-    final newTitle = info['title'] as String? ?? '';
-    final newDescription = info['description'] as String? ?? '';
-    final newMediaFiles = info['media'] as List<File>? ?? [];
+    // Se l'utente ha annullato o non è tornato nulla, interrompi
+    if (result == null || result is! Map<String, dynamic>) return;
 
+    // Estrai i dati restituiti dalla pagina di editing
+    final newCategory = result['category'] as String;
+    final newTitle = result['title'] as String? ?? '';
+    final newDescription = result['description'] as String? ?? '';
+    final newMediaFiles = result['media'] as List<File>? ?? [];
+
+    // Esegui l'aggiornamento con il tuo PlacesController
     await _placesController.updatePlace(
       placeId: place.id,
       userId: place.userId,
@@ -808,7 +866,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// Cancella il segnaposto dopo conferma
   Future<void> _deletePlace(Place place, BuildContext boxContext) async {
-    Navigator.of(boxContext).pop();
+
     final localContext = context;
     final confirm = await showDialog<bool>(
       context: localContext,
@@ -830,180 +888,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (confirm == true) {
       await _placesController.deletePlace(place.id);
       debugPrint('Eliminato segnaposto con ID: ${place.id}');
+
+      // Se vuoi nascondere la Card dopo l’eliminazione:
+      setState(() {
+        if (_selectedPlace?.id == place.id) {
+          _selectedPlace = null;
+        }
+      });
     }
-  }
-
-  /// Dialog per modificare un segnaposto esistente (supporta più media)
-  Future<Map<String, dynamic>?> _askEditPlaceDialog(BuildContext localContext, Place place) async {
-    String selectedCategory = place.category;
-    List<File> pickedMedia = [];
-
-    final titleController = TextEditingController(text: place.name);
-    final descriptionController = TextEditingController(text: place.description);
-
-    final result = await showModalBottomSheet<Map<String, dynamic>>(
-      context: localContext,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctxSB, setStateSB) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 16,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Modifica Segnaposto',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Text('Categoria: ', style: TextStyle(fontSize: 18)),
-                        DropdownButton<String>(
-                          value: selectedCategory,
-                          items: kCategoryItems,
-                          onChanged: (val) {
-                            if (val != null) {
-                              setStateSB(() => selectedCategory = val);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Campo per il Titolo
-                    Container(
-                      alignment: Alignment.centerLeft,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Titolo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-                          TextField(
-                            controller: titleController,
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.grey[200],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Campo per la Descrizione
-                    Container(
-                      alignment: Alignment.centerLeft,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Descrizione', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-                          TextField(
-                            controller: descriptionController,
-                            maxLines: 3,
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.grey[200],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final media = await _placesController.pickMedia();
-                        if (media != null && media.isNotEmpty) {
-                          setStateSB(() {
-                            pickedMedia.addAll(media);
-                          });
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Theme.of(localContext).colorScheme.primary,
-                      ),
-                      child: const Text(
-                        'Seleziona Nuovi Media',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (pickedMedia.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 100,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: pickedMedia.length,
-                          itemBuilder: (context, index) {
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.file(
-                                  pickedMedia[index],
-                                  height: 100,
-                                  width: 100,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(null),
-                          child: const Text('Annulla', style: TextStyle(color: Colors.red, fontSize: 18)),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(ctx).pop({
-                              'category': selectedCategory,
-                              'title': titleController.text,
-                              'description': descriptionController.text,
-                              'media': pickedMedia,
-                            });
-                          },
-                          child: const Text('Salva', style: TextStyle(fontSize: 18)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    titleController.dispose();
-    descriptionController.dispose();
-    return result;
   }
 
   /// Apre la pagina di ricerca e aggiorna la mappa in base al risultato
@@ -1021,7 +913,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         CameraUpdate.newLatLng(LatLng(lat, lng)),
       );
       setState(() {
-        // Aggiorna i marker: qui si sceglie se sostituire quelli esistenti
+        // Esempio: aggiunge un marker temporaneo sul punto cercato
         _placesController.markers.clear();
         _placesController.markers.add(
           Marker(
@@ -1051,6 +943,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             : _defaultPosition,
         zoom: 14.0,
       ),
+      onTap: (LatLng latLng) {
+        setState(() {
+          _selectedPlace = null; // Chiude la card
+        });
+      },
       onLongPress: _addMarkerAtPosition,
       markers: _placesController.markers.map((marker) {
         return marker.copyWith(
@@ -1067,6 +964,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Non aggiungiamo la bottomNavigationBar qui,
+    // perché è gestita in "main_screen.dart"
     return Scaffold(
       body: Stack(
         children: [
@@ -1173,12 +1072,38 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           // Mirino visualizzato quando si è in modalità selezione posizione
           if (!_isLoading && _selectingPosition)
             Positioned(
-              top: MediaQuery.of(context).size.height * 0.4,
-              left: MediaQuery.of(context).size.width * 0.4,
+              // Metà dell'altezza dello schermo meno metà della dimensione dell'icona
+              top: (MediaQuery.of(context).size.height / 2) - 24,
+              // Metà della larghezza dello schermo meno metà della dimensione dell'icona
+              left: (MediaQuery.of(context).size.width / 2) - 24,
               child: const Icon(
                 Icons.location_on,
                 size: 48,
                 color: Colors.redAccent,
+              ),
+            ),
+
+          // La Card del segnaposto selezionato, se presente
+          if (_selectedPlace != null)
+            Positioned(
+              // Aggiusta in base a quanto spazio occupa la bottom bar del main_screen
+              bottom: kBottomNavigationBarHeight + 50,
+              left: 16,
+              right: 16,
+              child: ConstrainedBox(
+              // Impone un'altezza massima, il 35% dello schermo
+              constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.35,
+              ),
+              // Se il contenuto supera la maxHeight, scorre
+                child: SizedBox(
+                  height: 300, // Tutte le card avranno la stessa altezza
+                  child: _buildFixedPlaceCard(
+                    _selectedPlace!,
+                    _selectedUsername,
+                    _selectedPhotoCount,
+            ),
+          ),
               ),
             ),
         ],

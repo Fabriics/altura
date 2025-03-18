@@ -12,7 +12,6 @@ import 'package:altura/views/settings_page.dart';
 import 'package:altura/views/signup_page.dart';
 import 'package:altura/models/user_model.dart';
 import 'package:altura/views/edit_profile_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:altura/theme/app_theme.dart';
 import 'package:altura/views/home_page.dart';

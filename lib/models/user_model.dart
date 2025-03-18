@@ -2,7 +2,9 @@ class AppUser {
   final String uid;
   final String? email;
   final String username;
-  final String? profilePictureUrl;
+  // Rimuoviamo profilePictureUrl, usiamo solo profileImageUrl
+  final String? profileImageUrl; // Il vero URL della foto profilo
+
   final String? bio;
   final String? location;
   final List<String> favoritePlaces;
@@ -12,7 +14,6 @@ class AppUser {
   final DateTime lastLogin;
   final bool isEmailVerified;
   final List<String> drones;
-  final String? profileImageUrl;
   final int? flightExperience;
   final String? instagram;
   final String? youtube;
@@ -22,7 +23,7 @@ class AppUser {
     required this.uid,
     this.email,
     required this.username,
-    this.profilePictureUrl,
+    this.profileImageUrl, // Unico campo per la foto
     this.bio,
     this.location,
     this.favoritePlaces = const [],
@@ -32,7 +33,6 @@ class AppUser {
     required this.lastLogin,
     this.isEmailVerified = false,
     this.drones = const [],
-    this.profileImageUrl,
     this.flightExperience,
     this.instagram,
     this.youtube,
@@ -44,7 +44,8 @@ class AppUser {
       'uid': uid,
       'email': email,
       'username': username,
-      'profilePictureUrl': profilePictureUrl,
+      // Salviamo solo profileImageUrl
+      'profileImageUrl': profileImageUrl,
       'bio': bio,
       'location': location,
       'savedPlaces': favoritePlaces,
@@ -54,7 +55,6 @@ class AppUser {
       'lastLogin': lastLogin.toIso8601String(),
       'isEmailVerified': isEmailVerified,
       'drones': drones,
-      'profileImageUrl': profileImageUrl,
       'flightExperience': flightExperience,
       'instagram': instagram,
       'youtube': youtube,
@@ -66,17 +66,18 @@ class AppUser {
     return AppUser(
       uid: map['uid'],
       email: map['email'],
-      username: map['username'],
-      profilePictureUrl: map['profilePictureUrl'],
+      username: map['username'] ?? '',
+      // Leggiamo solo profileImageUrl
+      profileImageUrl: map['profileImageUrl'],
       bio: map['bio'],
       location: map['location'],
+      favoritePlaces: List<String>.from(map['savedPlaces'] ?? []),
       uploadedPlaces: List<String>.from(map['uploadedPlaces'] ?? []),
       purchasedItems: List<String>.from(map['purchasedItems'] ?? []),
       createdAt: DateTime.parse(map['createdAt']),
       lastLogin: DateTime.parse(map['lastLogin']),
       isEmailVerified: map['isEmailVerified'] ?? false,
       drones: List<String>.from(map['drones'] ?? []),
-      profileImageUrl: map['profileImageUrl'],
       flightExperience: map['flightExperience'],
       instagram: map['instagram'],
       youtube: map['youtube'],

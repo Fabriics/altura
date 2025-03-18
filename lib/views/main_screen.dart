@@ -1,5 +1,6 @@
 // lib/views/main_screen.dart
 
+import 'package:altura/views/chat_list_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -9,10 +10,10 @@ import 'rules_page.dart';
 import 'professionals_page.dart';
 import 'chat_page.dart';
 
-/// MainScreen con Drawer + NavBar galleggiante + pulsante personalizzato
+/// MainScreen con Drawer, BottomNavigationBar galleggiante e pulsante personalizzato
 /// in alto a sinistra per aprire il Drawer.
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -22,18 +23,20 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   AppUser? _appUser; // Dati personalizzati dell'utente
 
-  // Pagine principali (Home, Regole, Professionisti, Chat)
+  // Pagine principali: Home, Regole, Professionisti, Chat.
   final List<Widget> _pages = const [
     HomePage(),
     RulesPage(),
     ProfessionalsPage(),
-    ChatPage(),
+    ChatListPage(),
   ];
 
+  /// Aggiorna la pagina corrente
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
   }
 
+  /// Inizializza i dati dell'utente da Firestore
   Future<void> _initUser() async {
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser == null) {
@@ -69,15 +72,16 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Drawer personalizzato
       drawer: _buildDrawer(),
 
-      // Stack per la pagina e la nav bar flottante
+      // Stack che contiene la pagina corrente, il pulsante per il Drawer e la BottomNavigationBar
       body: Stack(
         children: [
           // 1) Pagina selezionata
           _pages[_selectedIndex],
 
-          // 2) Pulsante per aprire il Drawer (in alto a sinistra)
+          // 2) Pulsante in alto a sinistra per aprire il Drawer
           Positioned(
             top: 80.0,
             left: 16.0,
@@ -109,43 +113,50 @@ class _MainScreenState extends State<MainScreen> {
             left: 16,
             right: 16,
             bottom: 16,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: const [
-                  BoxShadow(
-                    // Personalizza ombra se vuoi
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(30),
-                child: BottomNavigationBar(
-                  type: BottomNavigationBarType.fixed,
-                  currentIndex: _selectedIndex,
-                  backgroundColor: Colors.white,
-                  selectedItemColor: Colors.blue,
-                  unselectedItemColor: Colors.grey,
-                  onTap: _onItemTapped,
-                  items: const [
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.map),
-                      label: 'Mappa',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.rule),
-                      label: 'Regole',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.person),
-                      label: 'Professionisti',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.chat),
-                      label: 'Chat',
+            child: SafeArea(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      offset: Offset(0, 5),
+                      blurRadius: 15,
                     ),
                   ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: BottomNavigationBar(
+                    type: BottomNavigationBarType.fixed,
+                    currentIndex: _selectedIndex,
+                    backgroundColor: Colors.white,
+                    elevation: 0,
+                    selectedItemColor: Colors.blue,
+                    unselectedItemColor: Colors.grey,
+                    showSelectedLabels: true,
+                    showUnselectedLabels: true,
+                    onTap: _onItemTapped,
+                    items: const [
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.map),
+                        label: 'Mappa',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.rule),
+                        label: 'Regole',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.person),
+                        label: 'Professionisti',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.chat),
+                        label: 'Chat',
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -155,13 +166,14 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Esempio di Drawer personalizzato
+  /// Costruisce un Drawer personalizzato per la navigazione laterale
   Widget _buildDrawer() {
     return Drawer(
       child: Container(
         color: Theme.of(context).colorScheme.primary,
         child: Column(
           children: [
+            // Header del Drawer
             DrawerHeader(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -179,7 +191,7 @@ class _MainScreenState extends State<MainScreen> {
                 ],
               ),
             ),
-            // Esempi di voci di menu...
+            // Voci di menu
             ListTile(
               leading: const Icon(Icons.account_circle_outlined, color: Colors.white, size: 28),
               title: const Text('Profilo', style: TextStyle(color: Colors.white, fontSize: 18)),
@@ -213,6 +225,7 @@ class _MainScreenState extends State<MainScreen> {
                 Navigator.pushNamed(context, '/about_page');
               },
             ),
+            // Logout posizionato in fondo al Drawer
             Expanded(
               child: Align(
                 alignment: Alignment.bottomCenter,
@@ -220,7 +233,7 @@ class _MainScreenState extends State<MainScreen> {
                   leading: const Icon(Icons.logout, color: Colors.white, size: 28),
                   title: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 18)),
                   onTap: () {
-                    // Logica logout
+                    // Logica di logout
                     Navigator.pushReplacementNamed(context, '/login_page');
                   },
                 ),

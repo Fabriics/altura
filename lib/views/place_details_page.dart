@@ -5,16 +5,18 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../models/place.dart';
 
-/// Pagina che mostra in dettaglio un segnaposto.
+/// Pagina che mostra in dettaglio un segnaposto a schermo intero,
+/// con card che riempie l'area fino al pulsante "Contact user" in fondo,
+/// descrizione scrollabile e media non tagliati.
 class PlaceDetailsPage extends StatefulWidget {
   final Place place;
   final String? username;
 
   const PlaceDetailsPage({
-    Key? key,
+    super.key,
     required this.place,
     this.username,
-  }) : super(key: key);
+  });
 
   @override
   State<PlaceDetailsPage> createState() => _PlaceDetailsPageState();
@@ -26,6 +28,7 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   @override
   void initState() {
     super.initState();
+    // Se lo username non è passato esplicitamente, lo recuperiamo da Firestore
     if (widget.username != null) {
       _username = widget.username!;
     } else {
@@ -33,6 +36,7 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
     }
   }
 
+  /// Recupera lo username dal DB, se non fornito direttamente.
   Future<void> _fetchUsername() async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -41,7 +45,7 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
           .get();
       if (doc.exists) {
         final data = doc.data();
-        if (data != null) {
+        if (data != null && mounted) {
           setState(() {
             _username = data['username'] ?? 'Senza nome';
           });
@@ -52,100 +56,216 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
     }
   }
 
+  /// Torna alla mappa
+  void _goToMap() {
+    Navigator.pop(context, {
+      'lat': widget.place.latitude,
+      'lng': widget.place.longitude,
+    });
+  }
+
+  /// Placeholder per contattare l'utente
+  void _contactUser() {
+    debugPrint('Contatta utente con ID: ${widget.place.userId}');
+  }
+
   @override
   Widget build(BuildContext context) {
-    String relativeTime = '';
-    if (widget.place.createdAt != null) {
-      relativeTime = timeago.format(widget.place.createdAt!);
-    }
-    bool isOwner = widget.place.userId == FirebaseAuth.instance.currentUser?.uid;
+    // Data/ora relativa del post (opzionale)
+    final relativeTime = widget.place.createdAt != null
+        ? timeago.format(widget.place.createdAt!)
+        : '';
+
+    // Se l'utente è proprietario del post
+    final bool isOwner =
+        widget.place.userId == FirebaseAuth.instance.currentUser?.uid;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.place.name),
-        actions: isOwner
-            ? [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              // Logica per modificare il post
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: () {
-              // Logica per eliminare il post
-            },
-          ),
-        ]
-            : null,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Carousel dei media
-            Container(
-              width: double.infinity,
-              height: 250,
-              decoration: BoxDecoration(
+      // Pulsante in fondo allo schermo
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          color: Colors.transparent,
+          padding: const EdgeInsets.all(16),
+          child: ElevatedButton(
+            onPressed: _contactUser,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                color: Colors.grey[300],
               ),
-              clipBehavior: Clip.antiAlias,
-              child: _buildMediaCarousel(widget.place),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _buildCategoryIcon(widget.place.category),
-                const SizedBox(width: 8),
-                Text(
-                  widget.place.category,
-                  style: Theme.of(context).textTheme.labelSmall,
+            child: const Text(
+              'Contact user',
+              style: TextStyle(fontSize: 18, color: Colors.white),
+            ),
+          ),
+        ),
+      ),
+
+      // Contenuto principale
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 1) La card occupa tutto lo spazio verticale fino al pulsante
+            Expanded(
+              child: Padding(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      // 2) Media con bordi arrotondati (sia sopra che sotto)
+                      //    e BoxFit.contain per non tagliare.
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Stack(
+                          children: [
+                            SizedBox(
+                              height: 350,
+                              width: double.infinity,
+                              child: _buildMediaCarousel(widget.place),
+                            ),
+                            // Opzioni se l'utente è proprietario
+                            if (isOwner)
+                              Positioned(
+                                top: 16,
+                                left: 16,
+                                child: Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit,
+                                          color: Colors.white),
+                                      onPressed: () {
+                                        debugPrint('Modifica post');
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete,
+                                          color: Colors.white),
+                                      onPressed: () {
+                                        debugPrint('Elimina post');
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            // Icona preferiti + "Show map"
+                            Positioned(
+                              top: 16,
+                              right: 16,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.favorite_border,
+                                        color: Colors.red),
+                                    onPressed: () {
+                                      debugPrint('Aggiunto ai preferiti');
+                                    },
+                                  ),
+                                  GestureDetector(
+                                    onTap: _goToMap,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(top: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color:
+                                            Colors.black,
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Text(
+                                        'Show map',
+                                        style: TextStyle(
+                                          color: Colors.blue,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 3) Contenuto testuale: scrollabile
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Titolo
+                              Text(
+                                widget.place.name,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+
+                              // Placeholder recensioni
+                              Row(
+                                children: const [
+                                  Icon(Icons.star, color: Colors.orangeAccent),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '4.5 (355 Reviews)',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+
+                              // Data di creazione (se presente)
+                              if (relativeTime.isNotEmpty)
+                                Text(
+                                  'Caricato $relativeTime',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              const SizedBox(height: 16),
+
+                              // Descrizione completa, senza "read more"
+                              if (widget.place.description != null &&
+                                  widget.place.description!.isNotEmpty)
+                                Text(
+                                  widget.place.description!,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.place.name,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
               ),
-            ),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () {
-                Navigator.pushNamed(context, '/profile_page', arguments: widget.place.userId);
-              },
-              child: Text(
-                'Pubblicato da $_username',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (relativeTime.isNotEmpty)
-              Text(
-                'Caricato $relativeTime',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            const SizedBox(height: 16),
-            if (widget.place.description != null && widget.place.description!.isNotEmpty)
-              Text(
-                widget.place.description!,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Icon(Icons.location_on, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(
-                  '${widget.place.latitude.toStringAsFixed(5)}, ${widget.place.longitude.toStringAsFixed(5)}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
             ),
           ],
         ),
@@ -153,7 +273,8 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
     );
   }
 
-  /// Visualizza i media in un carousel (PageView).
+  /// Carousel dei media con BoxFit.contain per NON tagliare l’immagine/video
+  /// e bordi arrotondati definiti dal ClipRRect esterno.
   Widget _buildMediaCarousel(Place place) {
     if (place.mediaFiles != null && place.mediaFiles!.isNotEmpty) {
       return PageView.builder(
@@ -161,7 +282,7 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
         itemBuilder: (context, index) {
           return Image.file(
             place.mediaFiles![index],
-            fit: BoxFit.cover,
+            fit: BoxFit.contain, // Non taglia il contenuto
           );
         },
       );
@@ -171,7 +292,7 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
         itemBuilder: (context, index) {
           return Image.network(
             place.mediaUrls![index],
-            fit: BoxFit.cover,
+            fit: BoxFit.contain, // Non taglia il contenuto
           );
         },
       );
@@ -182,22 +303,6 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
           child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
         ),
       );
-    }
-  }
-
-  /// Restituisce l'icona corrispondente alla categoria.
-  Widget _buildCategoryIcon(String category) {
-    switch (category) {
-      case 'pista_decollo':
-        return const Icon(Icons.flight_takeoff, color: Colors.red);
-      case 'area_volo_libera':
-        return const Icon(Icons.flight, color: Colors.green);
-      case 'area_restrizioni':
-        return const Icon(Icons.block, color: Colors.orange);
-      case 'punto_ricarica':
-        return const Icon(Icons.battery_full, color: Colors.blue);
-      default:
-        return const Icon(Icons.place, color: Colors.grey);
     }
   }
 }

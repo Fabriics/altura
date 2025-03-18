@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:altura/views/login_page.dart';
 
 
 class OnboardingPage extends StatefulWidget {
@@ -54,7 +53,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               // Top Section with Image Placeholder
               Expanded(
                 flex: 2,
-                child: Container(
+                child: SizedBox(
                   width: double.infinity,
                   child: Center(
                     child: Icon(

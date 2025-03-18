@@ -1,19 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+
 import '../models/user_model.dart';
 
 class ProfilePage extends StatefulWidget {
-  final AppUser user; // ricevi un utente già esistente, con almeno user.uid
+  final AppUser user; // Ricevi un utente con user.uid almeno
 
-  const ProfilePage({Key? key, required this.user}) : super(key: key);
+  const ProfilePage({super.key, required this.user});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  AppUser? _user; // user “locale”, che aggiorneremo dopo _fetchUserFromFirestore
+  AppUser? _user; // user locale, che aggiorneremo dopo _fetchUserFromFirestore
 
   @override
   void initState() {
@@ -57,16 +58,19 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final theme = Theme.of(context);
 
-    // Avatar
-    final avatar = (_user!.profilePictureUrl != null && _user!.profilePictureUrl!.isNotEmpty)
-        ? NetworkImage(_user!.profilePictureUrl!)
-        : const AssetImage('assets/images/default_avatar.png') as ImageProvider;
+    // Recuperiamo l'URL dal campo profileImageUrl (unico per la foto profilo)
+    final String? profileImageUrl = _user!.profileImageUrl;
 
-    // Contatori
+    // Se profileImageUrl è non-null e non vuoto, usiamo NetworkImage
+    final avatar = (profileImageUrl != null && profileImageUrl.isNotEmpty)
+        ? NetworkImage(profileImageUrl)
+        : const AssetImage('assets/placeholder.png') as ImageProvider;
+
+    // Esempi di contatori
     final segnapostiCount = _user!.uploadedPlaces.length;
     final salvatiCount = _user!.favoritePlaces.length;
 
-    // flightExperience -> stringa
+    // Converte flightExperience in stringa (es. "2" se flightExperience=2)
     final flightExperienceString =
     (_user!.flightExperience != null && _user!.flightExperience! > 0)
         ? _user!.flightExperience.toString()
@@ -74,21 +78,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF02398E),
         elevation: 0,
         title: Text(
           'Profilo',
           style: theme.textTheme.bodyLarge?.copyWith(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black),
-        // Pulsante in alto a destra per modificare il profilo
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit, color: Colors.grey),
+            icon: const Icon(Icons.edit, color: Colors.white),
             onPressed: () {
               // Naviga alla pagina di modifica profilo
               Navigator.pushNamed(context, '/edit_profile').then((_) {
@@ -114,7 +117,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 12),
 
             // 2) Username
@@ -123,35 +125,36 @@ class _ProfilePageState extends State<ProfilePage> {
                 _user!.username,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
               ),
 
-            // BIO subito sotto lo username
+            // 3) BIO
             if (_user!.bio != null && _user!.bio!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
+              const SizedBox(height: 8),
+              Container(
                 decoration: BoxDecoration(
-                  color: Colors.white, // ~0.8
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(),
+                      color: Colors.black,
                       blurRadius: 5,
                       offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 child: Text(
-                _user!.bio!,
-                style: theme.textTheme.bodyMedium,
-                textAlign: TextAlign.center,
+                  _user!.bio!,
+                  style: theme.textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
               ),
-              ),
-              ],
+            ],
             const SizedBox(height: 20),
 
-            // 3) Contatori
+            // 4) Contatori
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -159,22 +162,24 @@ class _ProfilePageState extends State<ProfilePage> {
                 _buildStatItem('Salvati', salvatiCount.toString(), context),
               ],
             ),
-
             const SizedBox(height: 20),
 
-            // 4) Droni con chip
+            // 5) Droni con chip
             if (_user!.drones.isNotEmpty) ...[
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'I miei droni',
-                  style: theme.textTheme.bodyMedium,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
               Wrap(
-                spacing: 1.0,
-                runSpacing: 0.3,
+                spacing: 6.0,
+                runSpacing: 4.0,
                 children: _user!.drones.map((drone) {
                   return Chip(
                     label: Text(drone),
@@ -186,7 +191,7 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 20),
             ],
 
-            // 5) Altre info (flightExperience, instagram, youtube, website)
+            // 6) Altre info (flightExperience, instagram, youtube, website)
             _buildBlueBorderField(
               context,
               label: 'Anni di volo',
@@ -215,6 +220,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  /// Mostra un contatore (ad es. "16 Segnaposti")
   Widget _buildStatItem(String label, String value, BuildContext context) {
     final theme = Theme.of(context);
     return Column(
@@ -223,16 +229,20 @@ class _ProfilePageState extends State<ProfilePage> {
           value,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
+            color: Colors.black87,
           ),
         ),
         Text(
           label,
-          style: theme.textTheme.labelLarge,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: Colors.grey[700],
+          ),
         ),
       ],
     );
   }
 
+  /// Mostra un TextField read-only con label blu se value è presente
   Widget _buildBlueBorderField(
       BuildContext context, {
         required String label,

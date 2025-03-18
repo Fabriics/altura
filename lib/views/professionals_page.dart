@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 /// Pagina di esempio per la ricerca e contatto con piloti professionisti.
 class ProfessionalsPage extends StatelessWidget {
-  const ProfessionalsPage({Key? key}) : super(key: key);
+  const ProfessionalsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
