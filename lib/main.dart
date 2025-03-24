@@ -1,20 +1,20 @@
-import 'package:altura/services/auth.dart';
-import 'package:altura/services/change_password.dart';
-import 'package:altura/services/forgot_password.dart';
-import 'package:altura/views/notifications_settings_page.dart';
-import 'package:altura/views/complete_profile_page.dart';
-import 'package:altura/views/login_page.dart';
-import 'package:altura/views/main_screen.dart';
-import 'package:altura/views/onboarding_page.dart';
-import 'package:altura/views/profile_page.dart';
-import 'package:altura/views/search_page.dart';
-import 'package:altura/views/settings_page.dart';
-import 'package:altura/views/signup_page.dart';
-import 'package:altura/models/user_model.dart';
-import 'package:altura/views/edit_profile_page.dart';
+import 'package:altura/services/auth_service.dart';
+import 'package:altura/services/change_password_service.dart';
+import 'package:altura/services/forgot_password_service.dart';
+import 'package:altura/views/home/settings/notifications_settings_page.dart';
+import 'package:altura/views/auth/complete_profile_page.dart';
+import 'package:altura/views/auth/login_page.dart';
+import 'package:altura/main_screen.dart';
+import 'package:altura/views/auth/onboarding_page.dart';
+import 'package:altura/views/home/profile/profile_page.dart';
+import 'package:altura/views/home/search_page.dart';
+import 'package:altura/views/home/settings/settings_page.dart';
+import 'package:altura/views/auth/signup_page.dart';
+import 'package:altura/models/user.dart';
+import 'package:altura/views/home/edit/edit_profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:altura/theme/app_theme.dart';
-import 'package:altura/views/home_page.dart';
+import 'package:altura/views/home/map_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -66,6 +66,7 @@ class MyApp extends StatelessWidget {
         '/edit_profile': (context) => EditProfilePage(),
         '/search_page': (context) => SearchPage(),
         '/notification_settings_page' : (context) => NotificationSettingsPage(),
+        '/main_screen': (context) => const MainScreen(),
       },
 
     );

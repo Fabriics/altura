@@ -1,46 +1,71 @@
-// lib/views/main_screen.dart
-
-import 'package:altura/views/chat_list_page.dart';
+import 'package:altura/views/home/chat/chat_list_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../models/user_model.dart';
-import 'home_page.dart';
-import 'rules_page.dart';
-import 'professionals_page.dart';
-import 'chat_page.dart';
+import 'models/user.dart';
+import 'views/home/map_page.dart';
+import 'views/home/rules_page.dart';
+import 'views/home/pilot_page.dart';
 
-/// MainScreen con Drawer, BottomNavigationBar galleggiante e pulsante personalizzato
-/// in alto a sinistra per aprire il Drawer.
+/// MainScreen con gestione dell'utente da Firestore e navigazione "fissa"
+/// (Drawer e BottomNavigationBar) ma implementata con IndexedStack
+/// per mantenere lo stato delle pagine. L'interfaccia visiva rimane la stessa
+/// (stessa UI "galleggiante"), ma sotto il cofano usiamo IndexedStack.
+///
+/// In questo modo:
+/// - Usiamo un unico Scaffold
+/// - Nel body abbiamo uno Stack "esterno" (che contiene la parte galleggiante),
+///   ma la pagina centrale è un IndexedStack che mantiene lo stato di ogni tab.
+/// - Non modifichiamo la UI (Drawer in alto a sinistra, Bottom Bar galleggiante in basso),
+///   ma otteniamo un codice più robusto e pulito.
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  const MainScreen({Key? key}) : super(key: key);
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
+  /// Indice selezionato nella BottomNavigationBar
   int _selectedIndex = 0;
-  AppUser? _appUser; // Dati personalizzati dell'utente
 
-  // Pagine principali: Home, Regole, Professionisti, Chat.
-  final List<Widget> _pages = const [
-    HomePage(),
-    RulesPage(),
-    ProfessionalsPage(),
-    ChatListPage(),
-  ];
+  /// Dati personalizzati dell'utente (caricati da Firestore)
+  AppUser? _appUser;
 
-  /// Aggiorna la pagina corrente
-  void _onItemTapped(int index) {
-    setState(() => _selectedIndex = index);
+  /// Flag per mostrare un loader quando stiamo caricando l'utente
+  bool _isLoadingUser = true;
+
+  /// Lista di pagine principali (Home, Regole, Professionisti, Chat).
+  /// Non modifichiamo la UI: le stesse 4 pagine di prima.
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    debugPrint("[MainScreen] initState chiamato.");
+
+    // Inizializziamo la lista di pagine
+    _pages = const [
+      HomePage(),      // Pagina 0
+      RulesPage(),     // Pagina 1
+      PilotPage(),     // Pagina 2
+      ChatListPage(),  // Pagina 3
+    ];
+
+    // Carichiamo l'utente
+    _initUser();
   }
 
-  /// Inizializza i dati dell'utente da Firestore
+  /// Carica i dati dell'utente da Firestore, se loggato
   Future<void> _initUser() async {
+    debugPrint("[MainScreen] _initUser: inizio caricamento utente Firestore...");
+
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser == null) {
-      debugPrint('Nessun utente loggato (firebaseUser == null)');
+      debugPrint("[MainScreen] _initUser: Nessun utente loggato -> stop");
+      setState(() {
+        _isLoadingUser = false;
+      });
       return;
     }
 
@@ -49,39 +74,88 @@ class _MainScreenState extends State<MainScreen> {
         .doc(firebaseUser.uid)
         .get();
 
-    debugPrint('Doc for user ${firebaseUser.uid}: ${doc.data()}');
+    debugPrint("[MainScreen] _initUser: doc.exists = ${doc.exists}");
 
-    if (doc.exists && doc.data() != null) {
-      final data = doc.data()!;
-      final userModel = AppUser.fromMap(data);
+    if (!doc.exists || doc.data() == null) {
+      debugPrint("[MainScreen] _initUser: Il documento utente non esiste o è vuoto");
       setState(() {
-        _appUser = userModel;
-        debugPrint('AppUser caricato con successo: $_appUser');
+        _appUser = null;
+        _isLoadingUser = false;
       });
     } else {
-      debugPrint('Il documento non esiste o è vuoto');
+      final data = doc.data()!;
+      final userModel = AppUser.fromMap(data);
+
+      debugPrint("[MainScreen] _initUser: Caricato con successo -> ${userModel.uid} / ${userModel.username}");
+
+      setState(() {
+        _appUser = userModel;
+        _isLoadingUser = false;
+      });
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _initUser();
+  /// Gestione tap su uno degli item della BottomNavigationBar
+  void _onItemTapped(int index) {
+    debugPrint("[MainScreen] _onItemTapped: index = $index");
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("[MainScreen] build chiamato. _appUser = $_appUser, _isLoadingUser = $_isLoadingUser");
+
+    // Se stiamo ancora caricando l'utente, mostriamo un loader
+    if (_isLoadingUser) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text("Caricamento utente..."),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Se l'utente è null (non trovato su Firestore), potremmo:
+    // 1) Mostrare un messaggio di errore
+    // 2) Reindirizzare a CompleteProfilePage
+    // 3) Oppure ignorare e mostrare UI parziale
+    if (_appUser == null) {
+      return Scaffold(
+        body: Center(
+          child: Text(
+            "Utente non trovato o profilo incompleto.\n"
+                "Torna indietro o completa il profilo.",
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    // Altrimenti, costruiamo la UI vera e propria
     return Scaffold(
       // Drawer personalizzato
       drawer: _buildDrawer(),
 
-      // Stack che contiene la pagina corrente, il pulsante per il Drawer e la BottomNavigationBar
+      // L'intero body è uno Stack,
+      // ma la parte "centrale" è un IndexedStack per le 4 pagine
       body: Stack(
         children: [
-          // 1) Pagina selezionata
-          _pages[_selectedIndex],
+          /// 1) IndexedStack per le pagine
+          ///    Mantiene lo stato di ogni tab senza ricostruire tutto.
+          IndexedStack(
+            index: _selectedIndex,
+            children: _pages,
+          ),
 
-          // 2) Pulsante in alto a sinistra per aprire il Drawer
+          /// 2) Pulsante in alto a sinistra per aprire il Drawer
           Positioned(
             top: 80.0,
             left: 16.0,
@@ -108,7 +182,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
 
-          // 3) BottomNavigationBar galleggiante in basso
+          /// 3) BottomNavigationBar galleggiante in basso
           Positioned(
             left: 16,
             right: 16,
@@ -166,7 +240,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Costruisce un Drawer personalizzato per la navigazione laterale
+  /// Drawer personalizzato
   Widget _buildDrawer() {
     return Drawer(
       child: Container(
@@ -197,6 +271,7 @@ class _MainScreenState extends State<MainScreen> {
               title: const Text('Profilo', style: TextStyle(color: Colors.white, fontSize: 18)),
               onTap: () {
                 Navigator.of(context).pop();
+                // Se _appUser è disponibile, la passiamo
                 Navigator.pushNamed(context, '/profile_page', arguments: _appUser);
               },
             ),

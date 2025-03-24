@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../models/place.dart';
-import '../services/places_service.dart';
+import '../../../models/place_model.dart';
+import '../../../services/places_service.dart';
 
 const List<DropdownMenuItem<String>> kCategoryItems = [
   DropdownMenuItem(value: 'pista_decollo', child: Text('Pista di decollo')),

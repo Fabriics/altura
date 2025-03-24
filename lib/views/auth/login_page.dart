@@ -1,7 +1,6 @@
-import 'package:altura/services/auth.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
+import 'package:altura/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,25 +18,31 @@ class _LoginPageState extends State<LoginPage> {
   String _passwordError = '';
   String _loginError = ''; // Messaggio di errore per credenziali errate
 
-  Future<bool> signIn(BuildContext context) async {
+  final Auth _authService = Auth();
+
+  /// Esegue il login utilizzando il servizio centralizzato.
+  Future<void> _handleSignIn() async {
+    setState(() {
+      _loginError = ''; // Resetta l'errore
+    });
     try {
-      await Auth().signInWithEmailAndPassword(
+      await _authService.signInWithEmailAndPassword(
         email: _email.text,
         password: _password.text,
       );
-      return true; // Login riuscito
+      Navigator.pushReplacementNamed(context, '/main_screen');
     } on FirebaseAuthException catch (error) {
+      String errorMessage = "";
       if (error.code == 'invalid-credential') {
-        setState(() {
-          _loginError = "Email e password non sono corrette. Assicurati di aver inserito correttamente le tue credenziali di accesso.";
-        });
+        errorMessage =
+        "Email e password non sono corrette. Assicurati di aver inserito correttamente le tue credenziali di accesso.";
       } else {
-        setState(() {
-          _loginError = "Si è verificato un errore sconosciuto. Riprova.";
-        });
+        errorMessage = "Inserisci le credenziali. Riprova.";
       }
+      setState(() {
+        _loginError = errorMessage;
+      });
       print(error.code);
-      return false; // Login fallito
     }
   }
 
@@ -116,15 +121,18 @@ class _LoginPageState extends State<LoginPage> {
                     onChanged: validateEmail,
                     decoration: InputDecoration(
                       hintText: "Email",
-                      hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
-                      prefixIcon: Icon(Icons.email, color: Theme.of(context).colorScheme.primary),
+                      hintStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.primary),
+                      prefixIcon: Icon(Icons.email,
+                          color: Theme.of(context).colorScheme.primary),
                       filled: true,
                       fillColor: Colors.grey[200],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                      contentPadding:
+                      const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
                   if (_emailError.isNotEmpty || _loginError.isNotEmpty)
@@ -137,7 +145,8 @@ class _LoginPageState extends State<LoginPage> {
                           Expanded(
                             child: Text(
                               _loginError.isNotEmpty ? _loginError : _emailError,
-                              style: const TextStyle(color: Colors.red, fontSize: 14),
+                              style: const TextStyle(
+                                  color: Colors.red, fontSize: 14),
                             ),
                           ),
                         ],
@@ -153,11 +162,15 @@ class _LoginPageState extends State<LoginPage> {
                     onChanged: validatePassword,
                     decoration: InputDecoration(
                       hintText: "Password",
-                      hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
-                      prefixIcon: Icon(Icons.lock, color: Theme.of(context).colorScheme.primary),
+                      hintStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.primary),
+                      prefixIcon: Icon(Icons.lock,
+                          color: Theme.of(context).colorScheme.primary),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                           color: Theme.of(context).colorScheme.primary,
                         ),
                         onPressed: () {
@@ -172,7 +185,8 @@ class _LoginPageState extends State<LoginPage> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                      contentPadding:
+                      const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
                   if (_passwordError.isNotEmpty)
@@ -185,7 +199,8 @@ class _LoginPageState extends State<LoginPage> {
                           Expanded(
                             child: Text(
                               _passwordError,
-                              style: const TextStyle(color: Colors.red, fontSize: 14),
+                              style: const TextStyle(
+                                  color: Colors.red, fontSize: 14),
                             ),
                           ),
                         ],
@@ -215,14 +230,8 @@ class _LoginPageState extends State<LoginPage> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
-                        setState(() {
-                          _loginError = ''; // Resetta l'errore
-                        });
                         if (_emailError.isEmpty && _passwordError.isEmpty) {
-                          final success = await signIn(context);
-                          if (success) {
-                            Navigator.pushNamed(context, '/home_page');
-                          }
+                          await _handleSignIn();
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -256,8 +265,12 @@ class _LoginPageState extends State<LoginPage> {
                           children: [
                             TextSpan(
                               text: "Registrati",
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                color:
+                                Theme.of(context).colorScheme.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

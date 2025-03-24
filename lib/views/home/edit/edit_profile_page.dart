@@ -23,6 +23,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController _youtubeController = TextEditingController();
   final TextEditingController _flightExperienceController = TextEditingController();
 
+  // **Nuovo**: Controller per la località
+  final TextEditingController _locationController = TextEditingController();
+
   // Gestione droni selezionati
   final Set<String> _selectedDrones = {};
   final List<String> _availableDrones = [
@@ -65,6 +68,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
           _flightExperienceController.text =
           (data['flightExperience']?.toString() ?? '');
           _profileImageUrl = data['profileImageUrl'];
+
+          // Se esiste la località salvata, la mettiamo nel controller
+          _locationController.text = data['location'] ?? '';
 
           // Se esiste la lista droni salvata, la aggiungiamo al set
           if (data['drones'] != null) {
@@ -130,6 +136,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'youtube': _youtubeController.text.trim(),
         'flightExperience': int.tryParse(_flightExperienceController.text) ?? 0,
         'drones': _selectedDrones.toList(),
+        // **Nuovo**: Aggiorniamo la località
+        'location': _locationController.text.trim(),
       };
 
       // Aggiorna i campi sul documento utente
@@ -199,12 +207,55 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
+  /// Costruisce un TextFormField generico
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String labelText,
+    String? hintText,
+    IconData? icon,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.grey[200],
+        labelText: labelText,
+        hintText: hintText,
+        labelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
+        hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
+        prefixIcon:
+        icon != null ? Icon(icon, color: Theme.of(context).colorScheme.primary) : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    // Rilasciamo i controller
+    _usernameController.dispose();
+    _bioController.dispose();
+    _websiteController.dispose();
+    _instagramController.dispose();
+    _youtubeController.dispose();
+    _flightExperienceController.dispose();
+    _locationController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
-      // AppBar semplice con titolo e pulsante "Salva"
+      // AppBar con titolo e pulsante "Salva"
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -217,8 +268,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
               // Salva le modifiche
               if (_formKey.currentState?.validate() ?? false) {
                 await _updateProfile();
-              } else {
-                // Gestione form non validi (opzionale)
               }
             },
           )
@@ -238,12 +287,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       CircleAvatar(
                         radius: 60,
                         backgroundColor: Colors.grey[300],
-                        backgroundImage: (_profileImageUrl != null &&
-                            _profileImageUrl!.isNotEmpty)
+                        backgroundImage:
+                        (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
                             ? NetworkImage(_profileImageUrl!)
                             : null,
-                        child: (_profileImageUrl == null ||
-                            _profileImageUrl!.isEmpty)
+                        child: (_profileImageUrl == null || _profileImageUrl!.isEmpty)
                             ? Icon(
                           Icons.person,
                           size: 60,
@@ -291,6 +339,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
                 const SizedBox(height: 24),
 
+                // **Nuovo**: Località
+                _buildTextField(
+                  controller: _locationController,
+                  labelText: "Località",
+                  hintText: "Es. Roma, Italia",
+                  icon: Icons.location_on,
+                ),
+                const SizedBox(height: 24),
+
                 // Selezione droni
                 Align(
                   alignment: Alignment.centerLeft,
@@ -309,14 +366,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   children: _selectedDrones.map((drone) {
                     return Chip(
                       label: Text(drone),
-                      deleteIcon: Icon(Icons.close,
-                          color: theme.colorScheme.primary),
+                      deleteIcon: Icon(Icons.close, color: theme.colorScheme.primary),
                       onDeleted: () {
                         setState(() => _selectedDrones.remove(drone));
                       },
                       backgroundColor: Colors.grey[200],
-                      labelStyle:
-                      TextStyle(color: theme.colorScheme.primary),
+                      labelStyle: TextStyle(color: theme.colorScheme.primary),
                     );
                   }).toList(),
                 ),
@@ -372,7 +427,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 40),
 
-                // Bottone Salva (alternativa al pulsante nell’AppBar)
+                // Bottone Salva (in alternativa a quello dell'AppBar)
                 ElevatedButton(
                   onPressed: () async {
                     if (_formKey.currentState?.validate() ?? false) {
@@ -400,48 +455,5 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
       ),
     );
-  }
-
-  /// Costruisce un TextFormField generico
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String labelText,
-    String? hintText,
-    IconData? icon,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
-  }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: Colors.grey[200],
-        labelText: labelText,
-        hintText: hintText,
-        labelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
-        hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
-        prefixIcon: icon != null
-            ? Icon(icon, color: Theme.of(context).colorScheme.primary)
-            : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    // Rilasciamo i controller
-    _usernameController.dispose();
-    _bioController.dispose();
-    _websiteController.dispose();
-    _instagramController.dispose();
-    _youtubeController.dispose();
-    _flightExperienceController.dispose();
-    super.dispose();
   }
 }

@@ -1,8 +1,9 @@
-import 'package:altura/views/verify_email_page.dart';
+import 'dart:async'; // Necessario per il debounce
+import 'package:altura/views/auth/verify_email_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../services/auth.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart'; // Per eseguire query su Firestore
+import '../../services/auth_service.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -12,32 +13,107 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
+  // Chiave del form per gestire le validazioni
   final _formKey = GlobalKey<FormState>();
+
+  // Controller per gestire gli input dell'utente
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
   final TextEditingController _confirmPassword = TextEditingController();
   final TextEditingController _username = TextEditingController();
 
+  // Timer usati per implementare il debounce
+  Timer? _usernameDebounce;
+  Timer? _passwordDebounce;
+
+  // Variabili per gestire la visibilità delle password
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  String _emailError = '';
 
+  // Variabili per visualizzare errori nei campi email, username e password
+  String _emailError = '';
+  String _usernameError = '';
+  String _passwordError = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // Listener per il controllo in tempo reale dello username
+    _username.addListener(_onUsernameChanged);
+    // Listener per il controllo in tempo reale della password
+    _password.addListener(_onPasswordChanged);
+  }
+
+  /// Listener che gestisce il debounce per il controllo in tempo reale dello username.
+  void _onUsernameChanged() {
+    if (_usernameDebounce?.isActive ?? false) _usernameDebounce!.cancel();
+    _usernameDebounce = Timer(const Duration(milliseconds: 500), () {
+      _checkUsernameUnique();
+    });
+  }
+
+  /// Controlla se lo username inserito è già presente in Firestore.
+  /// Se già in uso, imposta il messaggio d'errore per il campo username.
+  Future<void> _checkUsernameUnique() async {
+    final usernameText = _username.text.trim();
+    if (usernameText.isEmpty) {
+      setState(() {
+        _usernameError = '';
+      });
+      return;
+    }
+    try {
+      // Utilizza il metodo centralizzato nel service per il controllo di univocità
+      bool isUnique = await Auth().isUsernameUnique(usernameText);
+      setState(() {
+        _usernameError = isUnique ? '' : "L'username è già in uso.";
+      });
+    } catch (error) {
+      print("Errore nel controllo dello username: $error");
+    }
+  }
+
+  /// Listener che gestisce il debounce per il controllo in tempo reale della password.
+  /// La password deve avere almeno 8 caratteri e contenere almeno un numero.
+  void _onPasswordChanged() {
+    if (_passwordDebounce?.isActive ?? false) _passwordDebounce!.cancel();
+    _passwordDebounce = Timer(const Duration(milliseconds: 300), () {
+      final passwordText = _password.text;
+      if (passwordText.isEmpty) {
+        setState(() {
+          _passwordError = '';
+        });
+        return;
+      }
+      if (passwordText.length < 8) {
+        setState(() {
+          _passwordError = "La password deve avere almeno 8 caratteri.";
+        });
+      } else if (!RegExp(r'\d').hasMatch(passwordText)) {
+        setState(() {
+          _passwordError = "La password deve contenere almeno un numero.";
+        });
+      } else {
+        setState(() {
+          _passwordError = "";
+        });
+      }
+    });
+  }
+
+  /// Funzione per creare un nuovo utente tramite il service centralizzato.
   Future<void> createUser(BuildContext context) async {
     try {
-      // Creazione dell'utente
+      // Procede con la creazione dell'utente tramite Auth
       UserCredential userCredential = await Auth().createUserWithEmailAndPassword(
-        email: _email.text,
+        email: _email.text.trim(),
         password: _password.text,
-        username: _username.text,
+        username: _username.text.trim(),
       );
 
       User? user = userCredential.user;
-
-      // Invia email di verifica
+      // Se l'utente non ha ancora verificato l'email, naviga alla pagina di verifica
       if (user != null && !user.emailVerified) {
-        await user.sendEmailVerification();
-
-        // Naviga alla schermata di verifica email
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const VerifyEmailPage()),
@@ -49,8 +125,16 @@ class _SignUpPageState extends State<SignUpPage> {
           _emailError = "L'indirizzo email è già utilizzato da un altro account.";
         });
       } else {
-        // Gestione generica degli errori
         print("Error: ${error.message}");
+      }
+    } catch (error) {
+      // Gestisce l'errore per username già in uso
+      if (error.toString().contains("L'username è già in uso")) {
+        setState(() {
+          _usernameError = "L'username è già in uso.";
+        });
+      } else {
+        print("Errore in fase di creazione dell'utente: $error");
       }
     }
   }
@@ -76,7 +160,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
-
                 // Campo Username
                 TextFormField(
                   controller: _username,
@@ -97,18 +180,35 @@ class _SignUpPageState extends State<SignUpPage> {
                     if (value == null || value.isEmpty) {
                       return "Inserisci il tuo username";
                     }
+                    if (_usernameError.isNotEmpty) {
+                      return _usernameError;
+                    }
                     return null;
                   },
                 ),
+                if (_usernameError.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _usernameError,
+                            style: const TextStyle(color: Colors.red, fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 20),
-
                 // Campo Email
                 TextFormField(
-                  textInputAction: TextInputAction.next,
                   controller: _email,
+                  textInputAction: TextInputAction.next,
                   keyboardType: TextInputType.emailAddress,
                   onChanged: (_) {
-                    // Resetta l'errore quando l'utente modifica il campo email
                     setState(() {
                       _emailError = '';
                     });
@@ -149,7 +249,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                   ),
                 const SizedBox(height: 20),
-
                 // Campo Password
                 TextFormField(
                   controller: _password,
@@ -179,14 +278,32 @@ class _SignUpPageState extends State<SignUpPage> {
                     contentPadding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty || value.length < 8) {
-                      return "Inserisci una password di almeno 8 caratteri";
+                    if (value == null || value.isEmpty) {
+                      return "Inserisci una password";
+                    }
+                    if (_passwordError.isNotEmpty) {
+                      return _passwordError;
                     }
                     return null;
                   },
                 ),
+                if (_passwordError.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _passwordError,
+                            style: const TextStyle(color: Colors.red, fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 20),
-
                 // Campo Conferma Password
                 TextFormField(
                   controller: _confirmPassword,
@@ -223,7 +340,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   },
                 ),
                 const SizedBox(height: 40),
-
                 // Bottone di registrazione
                 SizedBox(
                   height: 60,
@@ -251,7 +367,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-
+                // Link per passare alla schermata di login
                 Align(
                   alignment: Alignment.center,
                   child: GestureDetector(
@@ -285,6 +401,10 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   void dispose() {
+    _username.removeListener(_onUsernameChanged);
+    _usernameDebounce?.cancel();
+    _password.removeListener(_onPasswordChanged);
+    _passwordDebounce?.cancel();
     _email.dispose();
     _password.dispose();
     _confirmPassword.dispose();
