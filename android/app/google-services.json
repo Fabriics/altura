@@ -12,7 +12,20 @@
           "package_name": "me.fabriziomoro.altura"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1048764100456-heqvhttgbd6jpvnj6p25p90aef823e33.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "me.fabriziomoro.altura",
+            "certificate_hash": "90845d93530879a048e7e72d6081b79f5165d1a9"
+          }
+        },
+        {
+          "client_id": "1048764100456-iqh5achdpasud1dptf6ofaaspejblpt5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDyt2hvjk6WEBWzFfjeiHBlLOQxh61OA44"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1048764100456-iqh5achdpasud1dptf6ofaaspejblpt5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1048764100456-4vlpdfukcp4061mkme3e58bou3aejpli.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "me.fabriziomoro.altura"
+              }
+            }
+          ]
         }
       }
     }

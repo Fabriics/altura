@@ -2,22 +2,15 @@ import 'package:altura/views/home/chat/chat_list_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'models/user.dart';
+import 'models/user_model.dart';
 import 'views/home/map_page.dart';
 import 'views/home/rules_page.dart';
 import 'views/home/pilot_page.dart';
 
 /// MainScreen con gestione dell'utente da Firestore e navigazione "fissa"
-/// (Drawer e BottomNavigationBar) ma implementata con IndexedStack
-/// per mantenere lo stato delle pagine. L'interfaccia visiva rimane la stessa
-/// (stessa UI "galleggiante"), ma sotto il cofano usiamo IndexedStack.
-///
-/// In questo modo:
-/// - Usiamo un unico Scaffold
-/// - Nel body abbiamo uno Stack "esterno" (che contiene la parte galleggiante),
-///   ma la pagina centrale è un IndexedStack che mantiene lo stato di ogni tab.
-/// - Non modifichiamo la UI (Drawer in alto a sinistra, Bottom Bar galleggiante in basso),
-///   ma otteniamo un codice più robusto e pulito.
+/// (Drawer e BottomNavigationBar) implementata con IndexedStack per mantenere
+/// lo stato delle pagine. La logica di navigazione è posticipata al termine
+/// del frame per evitare chiamate a setState() durante il build.
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
 
@@ -35,8 +28,7 @@ class _MainScreenState extends State<MainScreen> {
   /// Flag per mostrare un loader quando stiamo caricando l'utente
   bool _isLoadingUser = true;
 
-  /// Lista di pagine principali (Home, Regole, Professionisti, Chat).
-  /// Non modifichiamo la UI: le stesse 4 pagine di prima.
+  /// Lista di pagine principali (Home, Regole, Professionisti, Chat)
   late final List<Widget> _pages;
 
   @override
@@ -123,18 +115,16 @@ class _MainScreenState extends State<MainScreen> {
       );
     }
 
-    // Se l'utente è null (non trovato su Firestore), potremmo:
-    // 1) Mostrare un messaggio di errore
-    // 2) Reindirizzare a CompleteProfilePage
-    // 3) Oppure ignorare e mostrare UI parziale
+    // Se l'utente non è trovato su Firestore, posticipiamo la navigazione
     if (_appUser == null) {
-      return Scaffold(
+      // Evitiamo di chiamare Navigator.pushNamed direttamente nel build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/login_page');
+      });
+      // Restituiamo uno scaffold vuoto o un loader finché la navigazione non avviene
+      return const Scaffold(
         body: Center(
-          child: Text(
-            "Utente non trovato o profilo incompleto.\n"
-                "Torna indietro o completa il profilo.",
-            textAlign: TextAlign.center,
-          ),
+          child: CircularProgressIndicator(),
         ),
       );
     }
@@ -144,18 +134,19 @@ class _MainScreenState extends State<MainScreen> {
       // Drawer personalizzato
       drawer: _buildDrawer(),
 
-      // L'intero body è uno Stack,
-      // ma la parte "centrale" è un IndexedStack per le 4 pagine
+      // L'intero body è uno Stack:
+      // 1) IndexedStack per le pagine, per mantenere lo stato di ogni tab.
+      // 2) Pulsante per aprire il Drawer in alto a sinistra.
+      // 3) BottomNavigationBar galleggiante in basso.
       body: Stack(
         children: [
-          /// 1) IndexedStack per le pagine
-          ///    Mantiene lo stato di ogni tab senza ricostruire tutto.
+          // 1) Pagine principali tramite IndexedStack
           IndexedStack(
             index: _selectedIndex,
             children: _pages,
           ),
 
-          /// 2) Pulsante in alto a sinistra per aprire il Drawer
+          // 2) Pulsante in alto a sinistra per aprire il Drawer
           Positioned(
             top: 80.0,
             left: 16.0,
@@ -182,7 +173,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
 
-          /// 3) BottomNavigationBar galleggiante in basso
+          // 3) BottomNavigationBar galleggiante in basso
           Positioned(
             left: 16,
             right: 16,
@@ -271,7 +262,6 @@ class _MainScreenState extends State<MainScreen> {
               title: const Text('Profilo', style: TextStyle(color: Colors.white, fontSize: 18)),
               onTap: () {
                 Navigator.of(context).pop();
-                // Se _appUser è disponibile, la passiamo
                 Navigator.pushNamed(context, '/profile_page', arguments: _appUser);
               },
             ),
@@ -308,7 +298,6 @@ class _MainScreenState extends State<MainScreen> {
                   leading: const Icon(Icons.logout, color: Colors.white, size: 28),
                   title: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 18)),
                   onTap: () {
-                    // Logica di logout
                     Navigator.pushReplacementNamed(context, '/login_page');
                   },
                 ),

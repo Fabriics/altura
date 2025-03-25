@@ -1,8 +1,8 @@
 import 'package:altura/services/auth_service.dart';
-import 'package:altura/services/change_password_service.dart';
-import 'package:altura/services/forgot_password_service.dart';
+import 'package:altura/views/auth/forgot_password_page.dart';
+import 'package:altura/views/home/settings/change_password_page.dart';
 import 'package:altura/views/home/settings/notifications_settings_page.dart';
-import 'package:altura/views/auth/complete_profile_page.dart';
+import 'package:altura/views/auth/complete_profile_wizard.dart';
 import 'package:altura/views/auth/login_page.dart';
 import 'package:altura/main_screen.dart';
 import 'package:altura/views/auth/onboarding_page.dart';
@@ -10,7 +10,7 @@ import 'package:altura/views/home/profile/profile_page.dart';
 import 'package:altura/views/home/search_page.dart';
 import 'package:altura/views/home/settings/settings_page.dart';
 import 'package:altura/views/auth/signup_page.dart';
-import 'package:altura/models/user.dart';
+import 'package:altura/models/user_model.dart';
 import 'package:altura/views/home/edit/edit_profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:altura/theme/app_theme.dart';
@@ -60,7 +60,7 @@ class MyApp extends StatelessWidget {
         '/login_page' : (context) => const LoginPage(),
         '/onboarding_page' : (context) => const OnboardingPage(),
         '/signup_page' : (context) => const SignUpPage(),
-        '/complete_profile_page' : (context) => const CompleteProfilePage(),
+        '/complete_profile_page' : (context) => const CompleteProfileWizard(),
         '/change_password': (context) => const ChangePasswordPage(),
         '/forgot_password': (context) =>  ForgotPasswordPage(),
         '/edit_profile': (context) => EditProfilePage(),
@@ -68,7 +68,6 @@ class MyApp extends StatelessWidget {
         '/notification_settings_page' : (context) => NotificationSettingsPage(),
         '/main_screen': (context) => const MainScreen(),
       },
-
     );
   }
 }

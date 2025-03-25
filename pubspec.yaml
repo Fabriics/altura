@@ -51,6 +51,7 @@ dependencies:
   geoflutterfire_plus: ^0.0.32
   geocoding: ^3.0.0
   geolocator: ^13.0.3
+  google_sign_in: ^6.3.0
 
 dev_dependencies:
   flutter_test:
@@ -78,6 +79,10 @@ flutter:
   assets:
       - assets/google-icon.png
       - assets/logo.png
+      - assets/background_onboarding.png
+      - assets/background_onboarding2.jpg
+      - assets/background_onboarding3.jpeg
+      - assets/background_onboarding4.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

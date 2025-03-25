@@ -88,7 +88,12 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
               const SizedBox(height: 16),
               TextButton(
                 onPressed: _resendVerificationEmail,
-                child: const Text("Rinvia Email di Verifica"),
+                child: const Text("Rinvia Email di Verifica",
+                  style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),),
               ),
             ],
           ),

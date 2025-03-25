@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../../../models/user.dart';
+import '../../../models/user_model.dart';
 import 'favorites_page.dart';
 import 'updated_places_page.dart';
 
