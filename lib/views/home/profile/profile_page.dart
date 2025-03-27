@@ -6,7 +6,7 @@ import 'updated_places_page.dart';
 
 class ProfilePage extends StatelessWidget {
   final AppUser user;
-  const ProfilePage({Key? key, required this.user}) : super(key: key);
+  const ProfilePage({super.key, required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +203,7 @@ class ProfilePage extends StatelessWidget {
 // Sezione "Su di me" con Static Map
 class _AboutMeSection extends StatefulWidget {
   final AppUser user;
-  const _AboutMeSection({Key? key, required this.user}) : super(key: key);
+  const _AboutMeSection({super.key, required this.user});
 
   @override
   State<_AboutMeSection> createState() => _AboutMeSectionState();
@@ -298,7 +298,7 @@ class _AboutMeSectionState extends State<_AboutMeSection> {
 // Sezione "Informazioni": droni, social
 class _InfoSection extends StatelessWidget {
   final AppUser user;
-  const _InfoSection({Key? key, required this.user}) : super(key: key);
+  const _InfoSection({super.key, required this.user});
 
   @override
   Widget build(BuildContext context) {

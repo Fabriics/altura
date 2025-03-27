@@ -12,7 +12,7 @@ import 'views/home/pilot_page.dart';
 /// lo stato delle pagine. La logica di navigazione è posticipata al termine
 /// del frame per evitare chiamate a setState() durante il build.
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();

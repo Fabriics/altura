@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:altura/services/auth_service.dart';
 
-// Esempio di "contenitore" che gestisce i 4 step del profilo.
+/// Wizard in 4 step per completare il profilo utente.
 class CompleteProfileWizard extends StatefulWidget {
-  const CompleteProfileWizard({Key? key}) : super(key: key);
+  const CompleteProfileWizard({super.key});
 
   @override
   State<CompleteProfileWizard> createState() => _CompleteProfileWizardState();
@@ -12,28 +13,30 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
 
-  // Qui puoi inserire i controller o i dati da raccogliere.
+  // Istanza del service per salvare i dati su Firebase
+  final Auth _authService = Auth();
+
+  // Controller e variabili condivisi tra gli step
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController bioController = TextEditingController();
   final TextEditingController locationController = TextEditingController();
 
-  // Esempio: dati raccolti dallo step 3 (scelta droni e attività).
+  // Step 3: Selezione droni e attività
   String? selectedBrand;
   String? selectedModel;
   final Set<String> selectedActivities = {};
 
-  // Altri campi dell'ultimo step
+  // Step 4: Altri campi
   final TextEditingController websiteController = TextEditingController();
   final TextEditingController instagramController = TextEditingController();
   final TextEditingController youtubeController = TextEditingController();
 
-  // Pulsante "Salta": puoi decidere se chiudere la pagina, tornare indietro, ecc.
+  /// Pulsante "Salta": naviga direttamente alla Home (o dove preferisci).
   void _skip() {
-    // Esempio: naviga alla home o chiudi lo step
-    Navigator.pushReplacementNamed(context, '/home_page');
+    Navigator.pushReplacementNamed(context, '/main_screen');
   }
 
-  // Pulsante "Avanti" / "Completa"
+  /// Pulsante "Avanti" / "Completa"
   void _nextPage() {
     if (_currentIndex < 3) {
       setState(() {
@@ -45,92 +48,138 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
         curve: Curves.easeInOut,
       );
     } else {
-      // Ultimo step: invoca il salvataggio dei dati
+      // Ultimo step: salvataggio finale su Firebase
       _completeProfile();
     }
   }
 
+  /// Combina i dati raccolti e li invia a Firestore tramite `Auth.completeProfile()`.
   Future<void> _completeProfile() async {
-    // Qui salvi tutti i dati raccolti negli step
-    // Esempio: invoca il tuo AuthService o ProfileService
-    // ...
-    Navigator.pushReplacementNamed(context, '/home_page');
+    // Esempio: costruiamo una lista di droni a partire da marca e modello
+    final userDrones = <String>[];
+    if (selectedBrand != null && selectedBrand!.isNotEmpty) {
+      if (selectedModel != null && selectedModel!.isNotEmpty) {
+        userDrones.add('$selectedBrand $selectedModel');
+      } else {
+        userDrones.add(selectedBrand!);
+      }
+    }
+
+    try {
+      await _authService.completeProfile(
+        username: usernameController.text.trim(),
+        bio: bioController.text.trim(),
+        website: websiteController.text.trim(),
+        instagram: instagramController.text.trim(),
+        youtube: youtubeController.text.trim(),
+        // Se hai un campo dedicato per l’esperienza di volo,
+        // sostituisci "0" con flightExperienceController.text
+        flightExperience: '0',
+        drones: userDrones,
+        location: locationController.text.trim(),
+        // Aggiungi il parametro per le attività, se lo hai previsto in Auth
+        droneActivities: selectedActivities.toList(),
+      );
+
+      // Naviga alla Home (o altra pagina) dopo il salvataggio
+      Navigator.pushReplacementNamed(context, '/main_screen');
+    } catch (e) {
+      debugPrint("Errore completamento profilo: $e");
+      // Eventualmente mostra un messaggio di errore all’utente
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Errore: $e")),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Stack per eventuale sfondo/overlay se vuoi
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Pulsante "Salta" in alto a destra
-            Positioned(
-              top: 16,
-              right: 16,
-              child: TextButton(
-                onPressed: _skip,
-                child: const Text("Salta"),
+      // AppBar comune a tutti gli step
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF02398E),
+        title: Text(
+          'Completa profilo',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _skip,
+            child: Text(
+              'Salta',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Colors.white,
               ),
             ),
-            // Contenuto principale
-            Column(
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Contenuto a pagine
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      // 1) Foto e Username
-                      PhotoUsernameWidget(
-                        usernameController: usernameController,
-                      ),
-                      // 2) Biografia e Località
-                      BioLocationWidget(
-                        bioController: bioController,
-                        locationController: locationController,
-                      ),
-                      // 3) Selezione droni e attività
-                      DronesActivitiesWidget(
-                        selectedBrand: selectedBrand,
-                        selectedModel: selectedModel,
-                        onBrandModelChanged: (brand, model) {
-                          setState(() {
-                            selectedBrand = brand;
-                            selectedModel = model;
-                          });
-                        },
-                        selectedActivities: selectedActivities,
-                      ),
-                      // 4) Altri campi
-                      OtherDataWidget(
-                        websiteController: websiteController,
-                        instagramController: instagramController,
-                        youtubeController: youtubeController,
-                      ),
-                    ],
-                  ),
+                // 1) Foto e Username
+                PhotoUsernameWidget(
+                  usernameController: usernameController,
                 ),
-                // Pulsante Avanti / Completa in fondo
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _nextPage,
-                      child: Text(
-                        _currentIndex == 3 ? "Completa" : "Avanti",
-                      ),
-                    ),
-                  ),
-                )
+                // 2) Biografia e Località
+                BioLocationWidget(
+                  bioController: bioController,
+                  locationController: locationController,
+                ),
+                // 3) Droni e Attività
+                DronesActivitiesWidget(
+                  selectedBrand: selectedBrand,
+                  selectedModel: selectedModel,
+                  onBrandModelChanged: (brand, model) {
+                    setState(() {
+                      selectedBrand = brand;
+                      selectedModel = model;
+                    });
+                  },
+                  selectedActivities: selectedActivities,
+                ),
+                // 4) Altri campi
+                OtherDataWidget(
+                  websiteController: websiteController,
+                  instagramController: instagramController,
+                  youtubeController: youtubeController,
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+          // Pulsante Avanti/Completa
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _nextPage,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  _currentIndex == 3 ? 'Completa' : 'Avanti',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -141,7 +190,6 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
 // --------------------------------------------------------
 class PhotoUsernameWidget extends StatelessWidget {
   final TextEditingController usernameController;
-  // Qui potresti aggiungere un callback per caricare l'immagine
 
   const PhotoUsernameWidget({
     Key? key,
@@ -150,14 +198,28 @@ class PhotoUsernameWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const Spacer(),
-            // Esempio di avatar e pulsante di upload
-            CircleAvatar(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            "Foto profilo e Username",
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Scegli una foto profilo e il tuo username.",
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 24),
+          // Avatar + pulsante
+          Align(
+            alignment: Alignment.center,
+            child: CircleAvatar(
               radius: 50,
               backgroundColor: Colors.grey[300],
               child: Icon(
@@ -166,26 +228,46 @@ class PhotoUsernameWidget extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.center,
+            child: ElevatedButton.icon(
               onPressed: () {
-                // Esempio: logica di caricamento immagine
+                // TODO: Implementa la logica di caricamento immagine (uploadProfileImage)
               },
               icon: const Icon(Icons.camera_alt),
-              label: const Text("Carica foto"),
-            ),
-            const SizedBox(height: 32),
-            // Campo username
-            TextFormField(
-              controller: usernameController,
-              decoration: const InputDecoration(
-                labelText: "Username",
-                border: OutlineInputBorder(),
+              label: const Text(
+                "Carica foto",
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
-            const Spacer(),
-          ],
-        ),
+          ),
+          const SizedBox(height: 24),
+          // Campo username
+          Text(
+            "Username",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: usernameController,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              hintText: "Inserisci il tuo username",
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -206,38 +288,67 @@ class BioLocationWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const Spacer(),
-            TextFormField(
-              controller: bioController,
-              decoration: const InputDecoration(
-                labelText: "Biografia",
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            "2. Biografia e Località",
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 24),
-            TextFormField(
-              controller: locationController,
-              decoration: const InputDecoration(
-                labelText: "Località",
-                border: OutlineInputBorder(),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Racconta qualcosa di te e indica dove ti trovi.",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "Biografia",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: bioController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
               ),
+              hintText: "Scrivi una breve biografia su di te",
             ),
-            const Spacer(),
-          ],
-        ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "Località",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: locationController,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              hintText: "Es. Roma, Italia",
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
 // --------------------------------------------------------
-// 3) Widget per scelta Droni e Attività
+// 3) Widget per Droni e Attività
 // --------------------------------------------------------
 class DronesActivitiesWidget extends StatefulWidget {
   final String? selectedBrand;
@@ -258,7 +369,6 @@ class DronesActivitiesWidget extends StatefulWidget {
 }
 
 class _DronesActivitiesWidgetState extends State<DronesActivitiesWidget> {
-  // Esempio di brand -> modelli
   final List<String> brands = ["DJI", "Cinelog", "BetaFPV", "Altro"];
   final Map<String, List<String>> brandModels = {
     "DJI": ["Mini 3 Pro", "FPV", "Mavic Air", "Phantom"],
@@ -288,107 +398,119 @@ class _DronesActivitiesWidgetState extends State<DronesActivitiesWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Se la brand selezionata non esiste più, reset
-    if (localSelectedBrand != null && !brands.contains(localSelectedBrand)) {
-      localSelectedBrand = null;
-      localSelectedModel = null;
-    }
-
     final modelsForBrand = localSelectedBrand == null
         ? <String>[]
         : brandModels[localSelectedBrand!] ?? <String>[];
 
-    // Se il modello selezionato non è più presente, reset
+    // Se il modello salvato non è più presente, resettiamo
     if (localSelectedModel != null && !modelsForBrand.contains(localSelectedModel)) {
       localSelectedModel = null;
     }
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const Spacer(),
-            // Selezione brand
-            DropdownButtonFormField<String>(
-              value: localSelectedBrand,
-              hint: const Text("Seleziona la marca"),
-              items: brands
-                  .map(
-                    (brand) => DropdownMenuItem(
-                  value: brand,
-                  child: Text(brand),
-                ),
-              )
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  localSelectedBrand = value;
-                  localSelectedModel = null; // reset
-                });
-                widget.onBrandModelChanged(value, null);
-              },
-              decoration: const InputDecoration(border: OutlineInputBorder()),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            "3. Droni e Attività",
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
-            // Selezione modello (dipende dalla brand)
-            DropdownButtonFormField<String>(
-              value: localSelectedModel,
-              hint: const Text("Seleziona il modello"),
-              items: modelsForBrand
-                  .map(
-                    (model) => DropdownMenuItem(
-                  value: model,
-                  child: Text(model),
-                ),
-              )
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  localSelectedModel = value;
-                });
-                widget.onBrandModelChanged(localSelectedBrand, value);
-              },
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 24),
-            // Attività (checkbox)
-            Text(
-              "Cosa ti piace fare?",
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                itemCount: activities.length,
-                itemBuilder: (context, index) {
-                  final activity = activities[index];
-                  final isSelected = widget.selectedActivities.contains(activity);
-                  return CheckboxListTile(
-                    title: Text(activity),
-                    value: isSelected,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        if (value == true) {
-                          widget.selectedActivities.add(activity);
-                        } else {
-                          widget.selectedActivities.remove(activity);
-                        }
-                      });
-                    },
-                  );
-                },
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Seleziona la marca e il modello del tuo drone, poi indica cosa ti piace fare.",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 24),
+          // Selezione marca
+          Text(
+            "Marca",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: localSelectedBrand,
+            hint: const Text("Seleziona la marca"),
+            items: brands
+                .map((brand) => DropdownMenuItem(value: brand, child: Text(brand)))
+                .toList(),
+            onChanged: (value) {
+              setState(() {
+                localSelectedBrand = value;
+                localSelectedModel = null;
+              });
+              widget.onBrandModelChanged(value, null);
+            },
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          // Selezione modello
+          Text(
+            "Modello",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: localSelectedModel,
+            hint: const Text("Seleziona il modello"),
+            items: modelsForBrand
+                .map((model) => DropdownMenuItem(value: model, child: Text(model)))
+                .toList(),
+            onChanged: (value) {
+              setState(() {
+                localSelectedModel = value;
+              });
+              widget.onBrandModelChanged(localSelectedBrand, value);
+            },
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "Attività preferite",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          ...activities.map((activity) {
+            final isSelected = widget.selectedActivities.contains(activity);
+            return CheckboxListTile(
+              title: Text(activity),
+              value: isSelected,
+              onChanged: (bool? value) {
+                setState(() {
+                  if (value == true) {
+                    widget.selectedActivities.add(activity);
+                  } else {
+                    widget.selectedActivities.remove(activity);
+                  }
+                });
+              },
+              activeColor: Theme.of(context).colorScheme.primary,
+            );
+          }).toList(),
+        ],
       ),
     );
   }
 }
 
 // --------------------------------------------------------
-// 4) Widget per gli altri campi
+// 4) Widget per gli Altri Dati
 // --------------------------------------------------------
 class OtherDataWidget extends StatelessWidget {
   final TextEditingController websiteController;
@@ -404,38 +526,77 @@ class OtherDataWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const Spacer(),
-            TextFormField(
-              controller: websiteController,
-              decoration: const InputDecoration(
-                labelText: "Sito Web",
-                border: OutlineInputBorder(),
-              ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            "4. Altri dati",
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 24),
-            TextFormField(
-              controller: instagramController,
-              decoration: const InputDecoration(
-                labelText: "Instagram",
-                border: OutlineInputBorder(),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Facoltativo: inserisci i tuoi contatti o link social.",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "Sito Web",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: websiteController,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
               ),
+              hintText: "https://iltuosito.com",
             ),
-            const SizedBox(height: 24),
-            TextFormField(
-              controller: youtubeController,
-              decoration: const InputDecoration(
-                labelText: "YouTube",
-                border: OutlineInputBorder(),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "Instagram",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: instagramController,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
               ),
+              hintText: "@iltuonomeutente",
             ),
-            const Spacer(),
-          ],
-        ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "YouTube",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: youtubeController,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              hintText: "Link al tuo canale YouTube",
+            ),
+          ),
+        ],
       ),
     );
   }

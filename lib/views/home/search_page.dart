@@ -11,7 +11,7 @@ import 'package:geolocator/geolocator.dart';
 /// - Integra la posizione dell’utente (via Geolocator) per dare priorità
 ///   ai risultati vicini (impostando i parametri location & radius nelle query).
 class SearchPage extends StatefulWidget {
-  const SearchPage({Key? key}) : super(key: key);
+  const SearchPage({super.key});
 
   @override
   State<SearchPage> createState() => _SearchPageState();

@@ -1,7 +1,9 @@
+// user_model.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-// geoflutterfire_plus ti serve per calcolare geohash + geopoint in scrittura
 import 'package:geoflutterfire_plus/geoflutterfire_plus.dart';
 
+/// Modello utente (AppUser) per la tua app Altura.
 class AppUser {
   final String uid;
   final String? email;
@@ -22,10 +24,6 @@ class AppUser {
   final String? website;
   final String? fcmToken;
 
-  /// Invece di salvare `latitude` e `longitude` come double separati,
-  /// gestiremo la posizione come un "GeoFirePoint" su Firestore.
-  /// Tuttavia, per comodità, possiamo ancora memorizzare lat/long in locale,
-  /// se vogliamo, oppure ometterli del tutto.
   final double? latitude;
   final double? longitude;
 
@@ -53,13 +51,9 @@ class AppUser {
   });
 
   /// Converte l’istanza in una mappa (per salvare su Firestore).
-  /// Ora gestiamo "location" come un oggetto con "geopoint" e "geohash".
   Map<String, dynamic> toMap() {
-    // Se non abbiamo lat/long, potremmo non salvare affatto "location".
-    // Altrimenti, costruiamo un GeoFirePoint e includiamo geohash e geopoint.
     Map<String, dynamic>? locationMap;
     if (latitude != null && longitude != null) {
-      // Creiamo un GeoFirePoint con geoflutterfire_plus
       final geoPoint = GeoFirePoint(GeoPoint(latitude!, longitude!));
       locationMap = {
         'geopoint': geoPoint.geopoint,
@@ -73,10 +67,11 @@ class AppUser {
       'username': username,
       'profileImageUrl': profileImageUrl,
       'bio': bio,
-      'location': location, // (campo testuale se vuoi, es. "Roma, Italia")
+      'location': location,
       'favoritePlaces': favoritePlaces,
       'uploadedPlaces': uploadedPlaces,
-      'purchasedItems': droneActivities,
+      // Drone activities
+      'droneActivities': droneActivities,
       'createdAt': createdAt.toIso8601String(),
       'lastLogin': lastLogin.toIso8601String(),
       'isEmailVerified': isEmailVerified,
@@ -86,20 +81,15 @@ class AppUser {
       'youtube': youtube,
       'website': website,
       'fcmToken': fcmToken,
-
-      // "locationGeo" potrebbe essere un campo dedicato al salvataggio geofire
-      // Se preferisci chiamarlo "location", rinominalo pure, ma occhio ai conflitti
       'locationGeo': locationMap,
     };
   }
 
   /// Crea un AppUser a partire da una mappa (ad es. i dati Firestore).
-  /// Leggiamo "locationGeo" e, se presente, estraiamo lat/long da "geopoint".
   factory AppUser.fromMap(Map<String, dynamic> map) {
     double? lat;
     double? lng;
 
-    // Se esiste "locationGeo" con "geopoint"
     if (map['locationGeo'] != null) {
       final locMap = map['locationGeo'] as Map<String, dynamic>;
       final geoPoint = locMap['geopoint'] as GeoPoint?;
@@ -118,7 +108,7 @@ class AppUser {
       location: map['location'],
       favoritePlaces: List<String>.from(map['favoritePlaces'] ?? []),
       uploadedPlaces: List<String>.from(map['uploadedPlaces'] ?? []),
-      droneActivities: List<String>.from(map['purchasedItems'] ?? []),
+      droneActivities: List<String>.from(map['droneActivities'] ?? []),
       createdAt: DateTime.parse(map['createdAt']),
       lastLogin: DateTime.parse(map['lastLogin']),
       isEmailVerified: map['isEmailVerified'] ?? false,

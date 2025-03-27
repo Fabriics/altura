@@ -1,4 +1,4 @@
-import 'dart:async'; // Necessario per il debounce
+import 'dart:async';
 import 'package:altura/views/auth/verify_email_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -12,24 +12,24 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  // Chiave del form per gestire le validazioni
+  // Chiave del form per le validazioni.
   final _formKey = GlobalKey<FormState>();
 
-  // Controller per gestire gli input dell'utente
+  // Controller per email, password, conferma password e username.
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
   final TextEditingController _confirmPassword = TextEditingController();
   final TextEditingController _username = TextEditingController();
 
-  // Timer usati per implementare il debounce
+  // Timer per il debounce.
   Timer? _usernameDebounce;
   Timer? _passwordDebounce;
 
-  // Variabili per gestire la visibilità delle password
+  // Variabili per la visibilità della password.
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
-  // Variabili per visualizzare errori nei campi email, username e password
+  // Messaggi di errore.
   String _emailError = '';
   String _usernameError = '';
   String _passwordError = '';
@@ -37,13 +37,13 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   void initState() {
     super.initState();
-    // Listener per il controllo in tempo reale dello username
+    // Listener per il debounce dello username.
     _username.addListener(_onUsernameChanged);
-    // Listener per il controllo in tempo reale della password
+    // Listener per il debounce della password.
     _password.addListener(_onPasswordChanged);
   }
 
-  /// Listener che gestisce il debounce per il controllo in tempo reale dello username.
+  /// Listener per il debounce dello username.
   void _onUsernameChanged() {
     if (_usernameDebounce?.isActive ?? false) _usernameDebounce!.cancel();
     _usernameDebounce = Timer(const Duration(milliseconds: 500), () {
@@ -51,7 +51,7 @@ class _SignUpPageState extends State<SignUpPage> {
     });
   }
 
-  /// Controlla se lo username inserito è già presente in Firestore.
+  /// Controlla se lo username inserito è univoco su Firestore.
   Future<void> _checkUsernameUnique() async {
     final usernameText = _username.text.trim();
     if (usernameText.isEmpty) {
@@ -70,7 +70,7 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  /// Listener che gestisce il debounce per il controllo in tempo reale della password.
+  /// Listener per il debounce della password.
   void _onPasswordChanged() {
     if (_passwordDebounce?.isActive ?? false) _passwordDebounce!.cancel();
     _passwordDebounce = Timer(const Duration(milliseconds: 300), () {
@@ -97,7 +97,8 @@ class _SignUpPageState extends State<SignUpPage> {
     });
   }
 
-  /// Funzione per creare un nuovo utente tramite il service centralizzato.
+  /// Crea un nuovo utente tramite il servizio centralizzato.
+  /// Dopo la creazione, l'utente viene disconnesso e reindirizzato alla pagina di verifica email.
   Future<void> createUser(BuildContext context) async {
     try {
       UserCredential userCredential = await Auth().createUserWithEmailAndPassword(
@@ -108,6 +109,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
       User? user = userCredential.user;
       if (user != null && !user.emailVerified) {
+        // Mostriamo la pagina di verifica email
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const VerifyEmailPage()),
@@ -135,10 +137,9 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Utilizzo di uno Stack per lo sfondo, overlay e contenuto
+      // Sfondo con immagine e overlay per la leggibilità.
       body: Stack(
         children: [
-          // Sfondo (puoi modificare l'asset in base al design globale)
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
@@ -147,7 +148,6 @@ class _SignUpPageState extends State<SignUpPage> {
               ),
             ),
           ),
-          // Overlay scuro per migliorare la leggibilità
           Container(
             color: Colors.black.withOpacity(0.5),
           ),
@@ -353,7 +353,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       },
                     ),
                     const SizedBox(height: 40),
-                    // Bottone di registrazione
+                    // Bottone di registrazione.
                     SizedBox(
                       height: 60,
                       child: ElevatedButton(
@@ -380,7 +380,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    // Link per passare alla schermata di login
+                    // Link per passare alla schermata di login.
                     Align(
                       alignment: Alignment.center,
                       child: GestureDetector(

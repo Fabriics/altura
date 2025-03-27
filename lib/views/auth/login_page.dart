@@ -26,12 +26,16 @@ class _LoginPageState extends State<LoginPage> {
   String _passwordError = '';
   String _loginError = '';
 
+  // Flag per indicare se l'email non è verificata.
+  bool _emailNotVerified = false;
+
   // Istanza del servizio di autenticazione.
   final Auth _authService = Auth();
 
   Future<void> _handleSignIn() async {
     setState(() {
       _loginError = '';
+      _emailNotVerified = false;
     });
     try {
       await _authService.signInWithEmailAndPassword(
@@ -41,14 +45,23 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.pushReplacementNamed(context, '/main_screen');
     } on FirebaseAuthException catch (error) {
       String errorMessage = "";
-      if (error.code == 'invalid-credential') {
-        errorMessage = "Email e password non sono corrette. Assicurati di aver inserito correttamente le tue credenziali.";
+      if (error.code == 'email-not-verified') {
+        errorMessage = "Email non verificata";
+        setState(() {
+          _emailNotVerified = true;
+          _loginError = errorMessage;
+        });
+      } else if (error.code == 'invalid-credential') {
+        errorMessage = "Email e password non sono corrette.";
+        setState(() {
+          _loginError = errorMessage;
+        });
       } else {
         errorMessage = "Inserisci le credenziali. Riprova.";
+        setState(() {
+          _loginError = errorMessage;
+        });
       }
-      setState(() {
-        _loginError = errorMessage;
-      });
       print('Errore di autenticazione: ${error.code}');
     }
   }
@@ -77,6 +90,8 @@ class _LoginPageState extends State<LoginPage> {
     if (value.isEmpty) {
       setState(() {
         _emailError = "Inserisci la tua email";
+        _loginError = "";
+        _emailNotVerified = false;
       });
     } else {
       final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
@@ -86,7 +101,10 @@ class _LoginPageState extends State<LoginPage> {
         });
       } else {
         setState(() {
-          _emailError = '';
+          _emailError = "";
+          // Se l'utente modifica l'email, azzeriamo il flag di verifica non avvenuta.
+          _emailNotVerified = false;
+          _loginError = "";
         });
       }
     }
@@ -108,13 +126,29 @@ class _LoginPageState extends State<LoginPage> {
     Navigator.pushNamed(context, '/forgot_password');
   }
 
+  Future<void> _resendVerificationEmail() async {
+    try {
+      await _authService.resendVerificationEmail();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Email di verifica inviata nuovamente. Controlla la tua casella."),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Errore nel rinvio dell'email: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       // Utilizzo di uno Stack per lo sfondo, l'overlay e il contenuto.
       body: Stack(
         children: [
-          // Sfondo: usa lo stesso asset dell'onboarding per uniformità.
+          // Sfondo: asset uniforme con l'onboarding.
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
@@ -123,7 +157,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
-          // Overlay scuro per migliorare la leggibilità.
+          // Overlay scuro.
           Container(
             color: Colors.black.withOpacity(0.5),
           ),
@@ -136,7 +170,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
-                    // Logo dell'app centrato.
+                    // Logo dell'app.
                     Center(
                       child: Image.asset(
                         'assets/logo.png',
@@ -154,7 +188,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    // Campo di input per l'email.
+                    // Campo Email.
                     TextFormField(
                       textInputAction: TextInputAction.next,
                       keyboardType: TextInputType.emailAddress,
@@ -164,7 +198,7 @@ class _LoginPageState extends State<LoginPage> {
                       decoration: InputDecoration(
                         hintText: "Email",
                         hintStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
-                        prefixIcon: Icon(Icons.email, color: Colors.white),
+                        prefixIcon: const Icon(Icons.email, color: Colors.white),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.1),
                         border: OutlineInputBorder(
@@ -185,13 +219,15 @@ class _LoginPageState extends State<LoginPage> {
                               child: Text(
                                 _loginError.isNotEmpty ? _loginError : _emailError,
                                 style: const TextStyle(color: Colors.red, fontSize: 14),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
                       ),
                     const SizedBox(height: 10),
-                    // Campo di input per la password.
+                    // Campo Password.
                     TextFormField(
                       controller: _password,
                       textInputAction: TextInputAction.done,
@@ -201,7 +237,7 @@ class _LoginPageState extends State<LoginPage> {
                       decoration: InputDecoration(
                         hintText: "Password",
                         hintStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
-                        prefixIcon: Icon(Icons.lock, color: Colors.white),
+                        prefixIcon: const Icon(Icons.lock, color: Colors.white),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword ? Icons.visibility_off : Icons.visibility,
@@ -244,7 +280,7 @@ class _LoginPageState extends State<LoginPage> {
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: navigateToForgotPassword,
-                        child: Text(
+                        child: const Text(
                           "Password dimenticata?",
                           style: TextStyle(
                             color: Colors.white,
@@ -276,6 +312,18 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                     ),
+                    // Link per rinviare l'email di verifica (visibile solo se l'errore indica email non verificata e l'email è compilata).
+                    if (_emailNotVerified && _email.text.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: TextButton(
+                          onPressed: _resendVerificationEmail,
+                          child: const Text(
+                            "Rinvia email di verifica",
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 10),
                     // Link per la registrazione.
                     Align(
@@ -302,7 +350,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    // Divisore.
                     const Divider(color: Colors.white38),
                     const SizedBox(height: 16),
                     // Pulsante per il login tramite Google.

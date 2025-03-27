@@ -1270,6 +1270,8 @@ PODS:
   - Flutter (1.0.0)
   - flutter_open_app_settings (0.0.1):
     - Flutter
+  - fluttertoast (0.0.2):
+    - Flutter
   - geocoding_ios (1.0.5):
     - Flutter
   - geolocator_apple (1.2.0):
@@ -1448,6 +1450,7 @@ DEPENDENCIES:
   - firebase_storage (from `.symlinks/plugins/firebase_storage/ios`)
   - Flutter (from `Flutter`)
   - flutter_open_app_settings (from `.symlinks/plugins/flutter_open_app_settings/ios`)
+  - fluttertoast (from `.symlinks/plugins/fluttertoast/ios`)
   - geocoding_ios (from `.symlinks/plugins/geocoding_ios/ios`)
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/darwin`)
   - google_maps_flutter_ios (from `.symlinks/plugins/google_maps_flutter_ios/ios`)
@@ -1508,6 +1511,8 @@ EXTERNAL SOURCES:
     :path: Flutter
   flutter_open_app_settings:
     :path: ".symlinks/plugins/flutter_open_app_settings/ios"
+  fluttertoast:
+    :path: ".symlinks/plugins/fluttertoast/ios"
   geocoding_ios:
     :path: ".symlinks/plugins/geocoding_ios/ios"
   geolocator_apple:
@@ -1552,6 +1557,7 @@ SPEC CHECKSUMS:
   FirebaseStorage: 8eede00081a6ce904eaa8d2daa66f1e053e8e6ea
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_open_app_settings: 4b43abd61edc27ee4b6bee2dbc5ccc9033861d0f
+  fluttertoast: 21eecd6935e7064cc1fcb733a4c5a428f3f24f0f
   geocoding_ios: d7460f56e80e118d57678efe5c2cdc888739ff18
   geolocator_apple: 66b711889fd333205763b83c9dcf0a57a28c7afd
   Google-Maps-iOS-Utils: 66d6de12be1ce6d3742a54661e7a79cb317a9321

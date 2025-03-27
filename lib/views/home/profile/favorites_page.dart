@@ -6,7 +6,7 @@ import '../place_details_page.dart';
 class FavoritesPage extends StatefulWidget {
   final List<String> placeIds;
 
-  const FavoritesPage({Key? key, required this.placeIds}) : super(key: key);
+  const FavoritesPage({super.key, required this.placeIds});
 
   @override
   State<FavoritesPage> createState() => _FavoritesPageState();

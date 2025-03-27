@@ -257,9 +257,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return Scaffold(
       // AppBar con titolo e pulsante "Salva"
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF02398E),
         elevation: 0,
-        title: const Text('Modifica Profilo'),
+        title: Text('Modifica Profilo', style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),),
         centerTitle: true,
         actions: [
           IconButton(

@@ -6,7 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 
 class RulesPage extends StatefulWidget {
-  const RulesPage({Key? key}) : super(key: key);
+  const RulesPage({super.key});
 
   @override
   State<RulesPage> createState() => _RulesPageState();
