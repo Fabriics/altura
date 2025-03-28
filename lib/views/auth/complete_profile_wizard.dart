@@ -31,7 +31,7 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
   final TextEditingController instagramController = TextEditingController();
   final TextEditingController youtubeController = TextEditingController();
 
-  /// Pulsante "Salta": naviga direttamente alla Home (o dove preferisci).
+  /// Pulsante "Salta": naviga direttamente alla Home.
   void _skip() {
     Navigator.pushReplacementNamed(context, '/main_screen');
   }
@@ -72,20 +72,17 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
         website: websiteController.text.trim(),
         instagram: instagramController.text.trim(),
         youtube: youtubeController.text.trim(),
-        // Se hai un campo dedicato per l’esperienza di volo,
-        // sostituisci "0" con flightExperienceController.text
+        // Se hai un campo dedicato per l’esperienza di volo, sostituisci "0" con il valore appropriato.
         flightExperience: '0',
         drones: userDrones,
         location: locationController.text.trim(),
-        // Aggiungi il parametro per le attività, se lo hai previsto in Auth
+        // Aggiungi il parametro per le attività se previsto in Auth.
         droneActivities: selectedActivities.toList(),
       );
-
-      // Naviga alla Home (o altra pagina) dopo il salvataggio
+      // Naviga alla Home dopo il salvataggio.
       Navigator.pushReplacementNamed(context, '/main_screen');
     } catch (e) {
       debugPrint("Errore completamento profilo: $e");
-      // Eventualmente mostra un messaggio di errore all’utente
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Errore: $e")),
       );
@@ -95,9 +92,9 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // AppBar comune a tutti gli step
+      // AppBar comune a tutti gli step: usa il colore primario e stili coerenti con il tema.
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02398E),
+        backgroundColor: Theme.of(context).colorScheme.primary,
         title: Text(
           'Completa profilo',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -119,22 +116,20 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
       ),
       body: Column(
         children: [
-          // Contenuto a pagine
+          // Contenuto a pagine del wizard.
           Expanded(
             child: PageView(
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                // 1) Foto e Username
-                PhotoUsernameWidget(
-                  usernameController: usernameController,
-                ),
-                // 2) Biografia e Località
+                // 1) Foto e Username.
+                PhotoUsernameWidget(usernameController: usernameController),
+                // 2) Biografia e Località.
                 BioLocationWidget(
                   bioController: bioController,
                   locationController: locationController,
                 ),
-                // 3) Droni e Attività
+                // 3) Droni e Attività.
                 DronesActivitiesWidget(
                   selectedBrand: selectedBrand,
                   selectedModel: selectedModel,
@@ -146,7 +141,7 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
                   },
                   selectedActivities: selectedActivities,
                 ),
-                // 4) Altri campi
+                // 4) Altri campi.
                 OtherDataWidget(
                   websiteController: websiteController,
                   instagramController: instagramController,
@@ -155,7 +150,7 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
               ],
             ),
           ),
-          // Pulsante Avanti/Completa
+          // Pulsante Avanti/Completa.
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: SizedBox(
@@ -163,6 +158,8 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
               child: ElevatedButton(
                 onPressed: _nextPage,
                 style: ElevatedButton.styleFrom(
+                  // Usa il colore primario dal tema.
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -170,10 +167,10 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
                 ),
                 child: Text(
                   _currentIndex == 3 ? 'Completa' : 'Avanti',
-                  style: const TextStyle(
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: Colors.white,
-                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
                 ),
               ),
@@ -191,10 +188,7 @@ class _CompleteProfileWizardState extends State<CompleteProfileWizard> {
 class PhotoUsernameWidget extends StatelessWidget {
   final TextEditingController usernameController;
 
-  const PhotoUsernameWidget({
-    Key? key,
-    required this.usernameController,
-  }) : super(key: key);
+  const PhotoUsernameWidget({Key? key, required this.usernameController}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +197,7 @@ class PhotoUsernameWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Titolo della sezione.
           Text(
             "Foto profilo e Username",
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -216,7 +211,7 @@ class PhotoUsernameWidget extends StatelessWidget {
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 24),
-          // Avatar + pulsante
+          // Avatar con pulsante per caricare la foto.
           Align(
             alignment: Alignment.center,
             child: CircleAvatar(
@@ -234,7 +229,7 @@ class PhotoUsernameWidget extends StatelessWidget {
             alignment: Alignment.center,
             child: ElevatedButton.icon(
               onPressed: () {
-                // TODO: Implementa la logica di caricamento immagine (uploadProfileImage)
+                // TODO: Implementa la logica per caricare la foto profilo.
               },
               icon: const Icon(Icons.camera_alt),
               label: const Text(
@@ -245,11 +240,12 @@ class PhotoUsernameWidget extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                backgroundColor: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
           const SizedBox(height: 24),
-          // Campo username
+          // Campo per inserire l'username.
           Text(
             "Username",
             style: Theme.of(context).textTheme.bodyMedium,
@@ -259,7 +255,7 @@ class PhotoUsernameWidget extends StatelessWidget {
             controller: usernameController,
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.grey[200],
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -315,7 +311,7 @@ class BioLocationWidget extends StatelessWidget {
             maxLines: 3,
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.grey[200],
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -333,7 +329,7 @@ class BioLocationWidget extends StatelessWidget {
             controller: locationController,
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.grey[200],
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -402,7 +398,7 @@ class _DronesActivitiesWidgetState extends State<DronesActivitiesWidget> {
         ? <String>[]
         : brandModels[localSelectedBrand!] ?? <String>[];
 
-    // Se il modello salvato non è più presente, resettiamo
+    // Se il modello salvato non è più presente, resettiamo.
     if (localSelectedModel != null && !modelsForBrand.contains(localSelectedModel)) {
       localSelectedModel = null;
     }
@@ -445,7 +441,7 @@ class _DronesActivitiesWidgetState extends State<DronesActivitiesWidget> {
             },
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.grey[200],
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -473,7 +469,7 @@ class _DronesActivitiesWidgetState extends State<DronesActivitiesWidget> {
             },
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.grey[200],
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -486,6 +482,7 @@ class _DronesActivitiesWidgetState extends State<DronesActivitiesWidget> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 8),
+          // Checkbox per ogni attività.
           ...activities.map((activity) {
             final isSelected = widget.selectedActivities.contains(activity);
             return CheckboxListTile(
@@ -552,7 +549,7 @@ class OtherDataWidget extends StatelessWidget {
             controller: websiteController,
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.grey[200],
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -570,7 +567,7 @@ class OtherDataWidget extends StatelessWidget {
             controller: instagramController,
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.grey[200],
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -588,7 +585,7 @@ class OtherDataWidget extends StatelessWidget {
             controller: youtubeController,
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.grey[200],
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,

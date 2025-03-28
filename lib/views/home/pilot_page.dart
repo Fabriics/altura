@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../models/user_model.dart';
+import '../../services/altura_loader.dart';
 import '../../services/pilot_service.dart';
 import 'chat/chat_page.dart';
 
@@ -23,19 +24,31 @@ class PilotPage extends StatelessWidget {
       builder: (context, snapshot) {
         // Mostra un loader mentre si ottiene la posizione.
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          return Scaffold(
+            appBar: AppBar(
+                automaticallyImplyLeading: false,
+                title: const Text("Piloti")
+            ),
+            body: const Center(child: AlturaLoader()),
           );
         }
         // Gestione degli errori nel recupero della posizione.
         if (snapshot.hasError) {
           return Scaffold(
+            appBar: AppBar(
+                automaticallyImplyLeading: false,
+                title: const Text("Piloti")
+            ),
             body: Center(child: Text('Errore nel recupero della posizione:\n${snapshot.error}')),
           );
         }
         if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: Text('Impossibile ottenere la posizione.')),
+          return Scaffold(
+            appBar: AppBar(
+                automaticallyImplyLeading: false,
+                title: const Text("Piloti")
+            ),
+            body: const Center(child: Text('Impossibile ottenere la posizione.')),
           );
         }
 
@@ -46,17 +59,25 @@ class PilotPage extends StatelessWidget {
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
               return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+                body: Center(child: AlturaLoader()),
               );
             }
             if (snap.hasError) {
               return Scaffold(
+                appBar: AppBar(
+                    automaticallyImplyLeading: false,
+                    title: const Text("Piloti")
+                ),
                 body: Center(child: Text('Errore nel recupero dei professionisti:\n${snap.error}')),
               );
             }
             if (!snap.hasData || snap.data!.isEmpty) {
-              return const Scaffold(
-                body: Center(child: Text('Nessun professionista trovato nel raggio di 50 km.')),
+              return Scaffold(
+                appBar: AppBar(
+                    automaticallyImplyLeading: false,
+                    title: const Text("Piloti")
+                ),
+                body: const Center(child: Text('Nessun professionista trovato nel raggio di 50 km.')),
               );
             }
 
@@ -64,8 +85,8 @@ class PilotPage extends StatelessWidget {
             final professionals = snap.data!;
             return Scaffold(
               appBar: AppBar(
-                title: const Text("Professionisti nelle vicinanze"),
-                centerTitle: true,
+                  automaticallyImplyLeading: false,
+                  title: const Text("Piloti")
               ),
               body: ListView.builder(
                 itemCount: professionals.length,

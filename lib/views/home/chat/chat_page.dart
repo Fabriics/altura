@@ -1,3 +1,4 @@
+import 'package:altura/services/altura_loader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ class _ChatPageState extends State<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  /// Invia il messaggio, se non vuoto, e scrolla verso il basso
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -26,6 +28,7 @@ class _ChatPageState extends State<ChatPage> {
     _scrollToBottom();
   }
 
+  /// Esegue uno scroll verso il fondo della lista dei messaggi
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
@@ -47,17 +50,22 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
+      // AppBar che utilizza il colore primario definito nel tema (blu profondo)
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02398E),
-        title: Text('Chat', style: Theme.of(context).textTheme.bodyLarge
-            ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: Text(
+          'Chat',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
       ),
       body: Column(
         children: [
+          // Sezione messaggi: usa StreamBuilder per aggiornamenti in tempo reale
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _chatService.messagesStream(widget.chatId),
@@ -66,7 +74,7 @@ class _ChatPageState extends State<ChatPage> {
                   return const Center(child: Text('Errore di connessione'));
                 }
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: AlturaLoader());
                 }
 
                 final docs = snapshot.data?.docs ?? [];
@@ -79,7 +87,9 @@ class _ChatPageState extends State<ChatPage> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: docs.length,
                   itemBuilder: (context, i) {
+                    // Ottiene i dati del messaggio
                     final data = docs[i].data()! as Map<String, dynamic>;
+                    // Determina se il messaggio è stato inviato dall'utente corrente
                     final isMe = data['senderId'] == FirebaseAuth.instance.currentUser?.uid;
                     final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
                     return _MessageBubble(
@@ -92,8 +102,10 @@ class _ChatPageState extends State<ChatPage> {
               },
             ),
           ),
+          // Sezione di invio messaggi
           Container(
-            color: Colors.grey[200],
+            // Usa il fillColor definito nell'inputDecorationTheme del tema
+            color: Theme.of(context).inputDecorationTheme.fillColor,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
@@ -108,8 +120,12 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                   ),
                 ),
+                // Icona per l'invio del messaggio con il colore primario del tema
                 IconButton(
-                  icon: const Icon(Icons.send, color: Color(0xFF02398E)),
+                  icon: Icon(
+                    Icons.send,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   onPressed: _sendMessage,
                 ),
               ],
@@ -121,6 +137,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 }
 
+/// Widget per visualizzare ogni messaggio in un "bubble"
 class _MessageBubble extends StatelessWidget {
   final String text;
   final bool isMe;
@@ -134,8 +151,11 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isMe ? const Color(0xFF02398E) : Colors.grey[300];
-    final textColor = isMe ? Colors.white : Colors.black87;
+    // Usa il colore primario per i messaggi inviati dall'utente, altrimenti un grigio chiaro
+    final bgColor = isMe ? Theme.of(context).colorScheme.primary : Colors.grey[300];
+    // Imposta il colore del testo in base al background: bianco se è un messaggio dell'utente, altrimenti nero
+    final textColor = isMe ? Theme.of(context).colorScheme.onPrimary : Colors.black87;
+    // Allineamento differente per i messaggi inviati e ricevuti
     final alignment = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
     return Padding(
@@ -149,8 +169,12 @@ class _MessageBubble extends StatelessWidget {
               color: bgColor,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(text, style: TextStyle(color: textColor)),
+            child: Text(
+              text,
+              style: TextStyle(color: textColor),
+            ),
           ),
+          // Visualizza l'orario se disponibile
           if (time != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),

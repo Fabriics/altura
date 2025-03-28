@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'altura_loader.dart';
 import 'auth_service.dart';
 
 /// Classe che raggruppa la logica di "Impostazioni":
@@ -64,7 +65,7 @@ class SettingsService {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (context) => const Center(child: AlturaLoader()),
     );
 
     try {

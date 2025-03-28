@@ -8,8 +8,10 @@ class OnboardingPage extends StatefulWidget {
 }
 
 class _OnboardingPageState extends State<OnboardingPage> {
+  // Indice della pagina di onboarding corrente
   int _currentIndex = 0;
 
+  // Dati per le pagine di onboarding: titolo, descrizione e un placeholder per l'immagine
   final List<Map<String, String>> _onboardingData = [
     {
       'title': 'Scopri i migliori posti per volare',
@@ -31,12 +33,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
     },
   ];
 
+  // Lista di immagini di background per ogni pagina di onboarding
   final List<String> _backgrounds = [
-    'assets/background_onboarding.png',
-    'assets/background_onboarding2.jpg',
-    'assets/background_onboarding3.jpeg',
+    'assets/onboarding/background_onboarding.png',
+    'assets/onboarding/background_onboarding2.jpg',
+    'assets/onboarding/background_onboarding3.jpeg',
   ];
 
+  /// Passa alla pagina successiva o, se è l'ultima, naviga alla pagina di registrazione.
   void _nextPage() {
     if (_currentIndex < _onboardingData.length - 1) {
       setState(() {
@@ -47,6 +51,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     }
   }
 
+  /// Naviga alla pagina di registrazione (o login).
   void _goToLoginPage() {
     Navigator.pushReplacementNamed(context, '/signup_page');
   }
@@ -54,9 +59,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Stack per sovrapporre il background, un overlay scuro e il contenuto.
       body: Stack(
         children: [
-          // Background animato che cambia ad ogni step
+          // Background animato che cambia ad ogni step con FadeTransition.
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 500),
             transitionBuilder: (Widget child, Animation<double> animation) {
@@ -75,17 +81,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ),
           ),
-          // Overlay per aumentare il contrasto (design minimalista)
+          // Overlay scuro per migliorare il contrasto del testo.
           Container(
             color: Colors.black.withOpacity(0.4),
           ),
+          // Contenuto principale in SafeArea.
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Contenuto in alto: Titolo e Descrizione con animazione
+                  // Sezione superiore: Titolo e Descrizione con animazione di slide e fade.
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 500),
                     transitionBuilder: (Widget child, Animation<double> animation) {
@@ -106,10 +113,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         Text(
                           _onboardingData[_currentIndex]['title']!,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
@@ -118,34 +122,33 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         Text(
                           _onboardingData[_currentIndex]['description']!,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(color: Colors.white),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  // Pulsante "Next" o "Sign In" in basso, con testo in grassetto
+                  // Pulsante "Next" (o "Sign In" nell'ultima pagina).
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _nextPage,
                       style: ElevatedButton.styleFrom(
+                        // Usa il colore primario (blu profondo) dal tema.
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        elevation: 0, // design flat e minimalista
+                        elevation: 0, // Design flat e minimalista.
                       ),
                       child: Text(
-                        _currentIndex == _onboardingData.length - 1
-                            ? 'Sign In'
-                            : 'Next',
-                        style: const TextStyle(
+                        _currentIndex == _onboardingData.length - 1 ? 'Sign In' : 'Next',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: Colors.white,
-                          fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
                       ),
                     ),
@@ -154,7 +157,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ),
           ),
-          // Bottone "Salta" posizionato in alto a destra
+          // Bottone "Salta" posizionato in alto a destra.
           Positioned(
             top: 40.0,
             right: 24.0,
@@ -162,7 +165,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               onPressed: _goToLoginPage,
               child: Text(
                 "Salta",
-                style: TextStyle(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.secondary,
                   fontSize: 16,
                 ),

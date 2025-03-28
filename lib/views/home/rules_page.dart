@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 // geocoding per fare reverse geocoding (lat/long -> isoCountryCode, etc.)
 import 'package:geocoding/geocoding.dart' as geo;
 
+import '../../services/altura_loader.dart';
+
 class RulesPage extends StatefulWidget {
   const RulesPage({super.key});
 
@@ -153,15 +155,21 @@ class _RulesPageState extends State<RulesPage> {
     // 1) Se stiamo caricando
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Regole di Volo")),
-        body: const Center(child: CircularProgressIndicator()),
+        appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: const Text("Regole di Volo")
+      ),
+        body: const Center(child: AlturaLoader()),
       );
     }
 
     // 2) Se c'è un errore
     if (_hasError) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Regole di Volo")),
+        appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: const Text("Regole di Volo")
+        ),
         body: Center(
           child: Text(
             _errorMessage ?? "Errore sconosciuto",

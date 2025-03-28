@@ -13,20 +13,20 @@ class EditProfilePage extends StatefulWidget {
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
+  // Chiave per il form
   final _formKey = GlobalKey<FormState>();
 
-  // Campi di testo
+  // Controller per i campi di testo
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _websiteController = TextEditingController();
   final TextEditingController _instagramController = TextEditingController();
   final TextEditingController _youtubeController = TextEditingController();
   final TextEditingController _flightExperienceController = TextEditingController();
-
-  // **Nuovo**: Controller per la località
+  // Nuovo: Controller per la località
   final TextEditingController _locationController = TextEditingController();
 
-  // Gestione droni selezionati
+  // Gestione dei droni selezionati
   final Set<String> _selectedDrones = {};
   final List<String> _availableDrones = [
     'DJI Mini 3 Pro',
@@ -46,17 +46,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _loadUserData();
   }
 
-  /// Carica i dati utente da Firestore e popola i campi del form
+  /// Carica i dati utente da Firestore e popola i campi del form.
   Future<void> _loadUserData() async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
 
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
         setState(() {
@@ -65,14 +61,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
           _websiteController.text = data['website'] ?? '';
           _instagramController.text = data['instagram'] ?? '';
           _youtubeController.text = data['youtube'] ?? '';
-          _flightExperienceController.text =
-          (data['flightExperience']?.toString() ?? '');
+          _flightExperienceController.text = (data['flightExperience']?.toString() ?? '');
           _profileImageUrl = data['profileImageUrl'];
-
-          // Se esiste la località salvata, la mettiamo nel controller
           _locationController.text = data['location'] ?? '';
-
-          // Se esiste la lista droni salvata, la aggiungiamo al set
           if (data['drones'] != null) {
             final List<dynamic> droneList = data['drones'];
             for (var d in droneList) {
@@ -86,33 +77,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  /// Permette all’utente di selezionare o sostituire la foto profilo
+  /// Permette all’utente di selezionare o sostituire la foto profilo.
   Future<void> _uploadProfileImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
     if (pickedFile != null) {
       try {
         final uid = FirebaseAuth.instance.currentUser?.uid;
         if (uid == null) return;
 
         final File imageFile = File(pickedFile.path);
-
-        // Carichiamo l'immagine su Firebase Storage
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('profile_images')
-            .child('$uid.jpg');
+        // Carica l'immagine su Firebase Storage
+        final storageRef = FirebaseStorage.instance.ref().child('profile_images').child('$uid.jpg');
         final uploadTask = storageRef.putFile(imageFile);
-
         final snapshot = await uploadTask;
         final downloadUrl = await snapshot.ref.getDownloadURL();
 
-        // Aggiorniamo l'URL dell'immagine in Firestore
+        // Aggiorna l'URL in Firestore
         await FirebaseFirestore.instance.collection('users').doc(uid).update({
           'profileImageUrl': downloadUrl,
         });
-
         setState(() {
           _profileImageUrl = downloadUrl;
         });
@@ -122,7 +106,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  /// Aggiorna i campi del profilo su Firestore
+  /// Aggiorna i dati del profilo su Firestore.
   Future<void> _updateProfile() async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -136,24 +120,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'youtube': _youtubeController.text.trim(),
         'flightExperience': int.tryParse(_flightExperienceController.text) ?? 0,
         'drones': _selectedDrones.toList(),
-        // **Nuovo**: Aggiorniamo la località
         'location': _locationController.text.trim(),
       };
 
-      // Aggiorna i campi sul documento utente
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .update(profileData);
-
-      // Torna alla pagina precedente (es. ProfilePage)
+      await FirebaseFirestore.instance.collection('users').doc(uid).update(profileData);
       Navigator.pop(context);
     } catch (e) {
       debugPrint('Errore nell\'aggiornamento del profilo: $e');
     }
   }
 
-  /// Mostra un dialog per selezionare i droni da una lista
+  /// Mostra un dialog per selezionare i droni.
   void _showDroneSelectionDialog() {
     showDialog(
       context: context,
@@ -169,9 +146,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 return CheckboxListTile(
                   title: Text(
                     drone,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    style: TextStyle(color: Theme.of(context).colorScheme.primary),
                   ),
                   value: _selectedDrones.contains(drone),
                   onChanged: (selected) {
@@ -198,7 +173,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
             ),
           ],
-          backgroundColor: Colors.grey[200],
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -207,7 +182,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  /// Costruisce un TextFormField generico
+  /// Costruisce un TextFormField generico allineato allo stile dell'app.
   Widget _buildTextField({
     required TextEditingController controller,
     required String labelText,
@@ -222,13 +197,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
       keyboardType: keyboardType,
       decoration: InputDecoration(
         filled: true,
-        fillColor: Colors.grey[200],
+        fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
         labelText: labelText,
         hintText: hintText,
         labelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
         hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
-        prefixIcon:
-        icon != null ? Icon(icon, color: Theme.of(context).colorScheme.primary) : null,
+        prefixIcon: icon != null ? Icon(icon, color: Theme.of(context).colorScheme.primary) : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -239,7 +213,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   void dispose() {
-    // Rilasciamo i controller
     _usernameController.dispose();
     _bioController.dispose();
     _websiteController.dispose();
@@ -253,22 +226,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
-      // AppBar con titolo e pulsante "Salva"
+      // AppBar: utilizza il colore primario del tema e titoli in bianco.
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02398E),
+        backgroundColor: theme.colorScheme.primary,
         elevation: 0,
-        title: Text('Modifica Profilo', style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),),
+        title: Text(
+          'Modifica Profilo',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: () async {
-              // Salva le modifiche
               if (_formKey.currentState?.validate() ?? false) {
                 await _updateProfile();
               }
@@ -290,8 +264,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       CircleAvatar(
                         radius: 60,
                         backgroundColor: Colors.grey[300],
-                        backgroundImage:
-                        (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
+                        backgroundImage: (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
                             ? NetworkImage(_profileImageUrl!)
                             : null,
                         child: (_profileImageUrl == null || _profileImageUrl!.isEmpty)
@@ -322,7 +295,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
                 // Username
                 _buildTextField(
                   controller: _usernameController,
@@ -331,7 +303,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   icon: Icons.person,
                 ),
                 const SizedBox(height: 24),
-
                 // Biografia
                 _buildTextField(
                   controller: _bioController,
@@ -341,8 +312,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   maxLines: 3,
                 ),
                 const SizedBox(height: 24),
-
-                // **Nuovo**: Località
+                // Località
                 _buildTextField(
                   controller: _locationController,
                   labelText: "Località",
@@ -350,7 +320,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   icon: Icons.location_on,
                 ),
                 const SizedBox(height: 24),
-
                 // Selezione droni
                 Align(
                   alignment: Alignment.centerLeft,
@@ -390,7 +359,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   child: const Text("Scegli i droni"),
                 ),
                 const SizedBox(height: 24),
-
                 // Sito Web
                 _buildTextField(
                   controller: _websiteController,
@@ -400,7 +368,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   keyboardType: TextInputType.url,
                 ),
                 const SizedBox(height: 24),
-
                 // Instagram
                 _buildTextField(
                   controller: _instagramController,
@@ -409,7 +376,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   icon: Icons.camera_alt,
                 ),
                 const SizedBox(height: 24),
-
                 // YouTube
                 _buildTextField(
                   controller: _youtubeController,
@@ -418,8 +384,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   icon: Icons.video_library,
                 ),
                 const SizedBox(height: 24),
-
-                // Anni di volo
+                // Esperienza di volo
                 _buildTextField(
                   controller: _flightExperienceController,
                   labelText: "Esperienza di volo (Anni)",
@@ -427,10 +392,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   icon: Icons.flight,
                   keyboardType: TextInputType.number,
                 ),
-
                 const SizedBox(height: 40),
-
-                // Bottone Salva (in alternativa a quello dell'AppBar)
+                // Bottone Salva Modifiche.
                 ElevatedButton(
                   onPressed: () async {
                     if (_formKey.currentState?.validate() ?? false) {
@@ -442,10 +405,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: theme.colorScheme.primary,
                   ),
                   child: Text(
                     "Salva Modifiche",
-                    style: TextStyle(
+                    style: theme.textTheme.titleLarge?.copyWith(
                       color: theme.colorScheme.onPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

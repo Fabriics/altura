@@ -79,11 +79,12 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
       - assets/google-icon.png
-      - assets/logo.png
-      - assets/background_onboarding.png
-      - assets/background_onboarding2.jpg
-      - assets/background_onboarding3.jpeg
-      - assets/background_onboarding4.jpg
+      - assets/logo/altura_logo_static.png
+      - assets/logo/altura_logo_loader.png
+      - assets/onboarding/background_onboarding.png
+      - assets/onboarding/background_onboarding2.jpg
+      - assets/onboarding/background_onboarding3.jpeg
+      - assets/onboarding/background_onboarding4.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

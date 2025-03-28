@@ -1,15 +1,14 @@
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../../models/place_model.dart';
+import '../../../services/altura_loader.dart';
 import '../../../services/places_service.dart';
 import '../edit/edit_place_page.dart';
 
-
 /// Pagina che mostra la lista dei segnaposti caricati dall'utente corrente.
-/// Permette di modificarli o eliminarli, simile a come fa "HomePage".
+/// Permette di modificarli o eliminarli, in modo simile a quanto avviene in HomePage.
 class UploadedPlacesPage extends StatefulWidget {
   final List<String> uploadedPlaceIds;
 
@@ -21,10 +20,10 @@ class UploadedPlacesPage extends StatefulWidget {
 }
 
 class _UploadedPlacesPageState extends State<UploadedPlacesPage> {
-  /// Service per operazioni di modifica/eliminazione segnaposti
+  /// Controller per operazioni di modifica/eliminazione segnaposti.
   final PlacesController _placesController = PlacesController();
 
-  /// Future che carica i segnaposti corrispondenti agli ID in [widget.uploadedPlaceIds]
+  /// Future che carica i segnaposti corrispondenti agli ID in [widget.uploadedPlaceIds].
   late Future<QuerySnapshot?> _placesFuture;
 
   @override
@@ -34,9 +33,9 @@ class _UploadedPlacesPageState extends State<UploadedPlacesPage> {
   }
 
   /// Carica i documenti della collezione "places" i cui ID sono in [widget.uploadedPlaceIds].
+  /// Se la lista è vuota, evita la query whereIn (che genera errore) e restituisce Future.value(null).
   void _loadPlaces() {
     if (widget.uploadedPlaceIds.isEmpty) {
-      // Se la lista è vuota, restituiamo Future.value(null) per evitare errori "whereIn"
       _placesFuture = Future.value(null);
     } else {
       _placesFuture = FirebaseFirestore.instance
@@ -48,36 +47,43 @@ class _UploadedPlacesPageState extends State<UploadedPlacesPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Se non ci sono ID, mostriamo subito un messaggio
+    final theme = Theme.of(context);
+
+    // Se non ci sono ID, mostriamo subito un messaggio centrato, usando gli stili del tema.
     if (widget.uploadedPlaceIds.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          backgroundColor: const Color(0xFF02398E),
+          backgroundColor: theme.colorScheme.primary,
           elevation: 0,
           title: Text(
             'I miei segnaposti',
-            style: Theme.of(context)
-                .textTheme
-                .bodyLarge
-                ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           centerTitle: true,
           iconTheme: const IconThemeData(color: Colors.white),
         ),
-        body: const Center(child: Text('Non hai caricato alcun segnaposto')),
+        body: Center(
+          child: Text(
+            'Non hai caricato alcun segnaposto',
+            style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+          ),
+        ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02398E),
+        backgroundColor: theme.colorScheme.primary,
         elevation: 0,
         title: Text(
           'I miei segnaposti',
-          style: Theme.of(context)
-              .textTheme
-              .bodyLarge
-              ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -86,21 +92,31 @@ class _UploadedPlacesPageState extends State<UploadedPlacesPage> {
         future: _placesFuture,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(child: Text('Errore di caricamento'));
+            return Center(
+              child: Text(
+                'Errore di caricamento',
+                style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+              ),
+            );
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: AlturaLoader());
           }
-
-          // Se future = null o la query non ha trovato documenti
+          // Se la query non restituisce documenti, mostriamo un messaggio.
           if (snapshot.data == null || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('Non hai caricato alcun segnaposto'));
+            return Center(
+              child: Text(
+                'Non hai caricato alcun segnaposto',
+                style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+              ),
+            );
           }
 
           final docs = snapshot.data!.docs;
           return ListView.builder(
             itemCount: docs.length,
             itemBuilder: (ctx, i) {
+              // Costruiamo il modello Place a partire dal documento Firestore.
               final place = Place.fromFirestore(docs[i]);
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -109,7 +125,7 @@ class _UploadedPlacesPageState extends State<UploadedPlacesPage> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Immagine con bordi arrotondati
+                      // Immagine del segnaposto con bordi arrotondati.
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: (place.mediaUrls != null && place.mediaUrls!.isNotEmpty)
@@ -127,48 +143,52 @@ class _UploadedPlacesPageState extends State<UploadedPlacesPage> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Colonna con titolo, descrizione e bottoni
+                      // Colonna con titolo, descrizione, data e bottoni.
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Titolo
+                            // Titolo del segnaposto.
                             Text(
                               place.name,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            // Descrizione
+                            // Descrizione, se presente.
                             if (place.description != null && place.description!.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
                                   place.description!,
-                                  style: const TextStyle(fontSize: 14, color: Colors.black54),
+                                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            // Data caricamento (timeago)
+                            // Data di caricamento, formattata con timeago.
                             if (place.createdAt != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
                                   'Caricato ${timeago.format(place.createdAt!)}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
                                 ),
                               ),
-                            // Bottoni Edit / Delete
+                            // Bottoni per modificare ed eliminare il segnaposto.
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blueGrey),
+                                  icon: Icon(Icons.edit, color: theme.colorScheme.primary),
                                   onPressed: () => _editPlace(place),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                  icon: Icon(Icons.delete, color: theme.colorScheme.error),
                                   onPressed: () => _deletePlace(place),
                                 ),
                               ],
@@ -187,22 +207,17 @@ class _UploadedPlacesPageState extends State<UploadedPlacesPage> {
     );
   }
 
-  /// Apre la pagina di modifica (EditPlacePage). Al ritorno, se c'è un result, aggiorna i dati
+  /// Apre la pagina di modifica (EditPlacePage). Al ritorno, se ci sono aggiornamenti, ricarica i segnaposti.
   Future<void> _editPlace(Place place) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => EditPlacePage(place: place)),
     );
-
-    // Se l'utente ha annullato o non è tornato nulla, interrompi
     if (result == null || result is! Map<String, dynamic>) return;
-
     final newCategory = result['category'] as String;
     final newTitle = result['title'] as String? ?? '';
     final newDescription = result['description'] as String? ?? '';
     final newMediaFiles = result['media'] as List<File>? ?? [];
-
-    // Esegui l'aggiornamento con il tuo PlacesController
     await _placesController.updatePlace(
       placeId: place.id,
       userId: place.userId,
@@ -211,13 +226,11 @@ class _UploadedPlacesPageState extends State<UploadedPlacesPage> {
       newCategory: newCategory,
       newMediaFiles: newMediaFiles,
     );
-
-    // Ricarica la lista
     _loadPlaces();
     setState(() {});
   }
 
-  /// Conferma e cancella il segnaposto
+  /// Mostra un dialog per confermare l'eliminazione e, se confermato, elimina il segnaposto.
   Future<void> _deletePlace(Place place) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -238,19 +251,10 @@ class _UploadedPlacesPageState extends State<UploadedPlacesPage> {
     );
     if (confirm == true) {
       await _placesController.deletePlace(place.id);
-      // Ricarichiamo la lista
-      _loadPlaces();
-      // 1) Rimuovi il documento da 'places'
-      await FirebaseFirestore.instance
-          .collection('places')
-          .doc(place.id)
-          .delete();
-
-      // 2) Rimuovi l'ID dall'array "uploadedPlaces" del documento utente
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(place.userId)
-          .update({
+      // Rimuove il documento dal database
+      await FirebaseFirestore.instance.collection('places').doc(place.id).delete();
+      // Aggiorna l'array "uploadedPlaces" del documento utente rimuovendo l'ID
+      await FirebaseFirestore.instance.collection('users').doc(place.userId).update({
         'uploadedPlaces': FieldValue.arrayRemove([place.id]),
       });
       setState(() {});

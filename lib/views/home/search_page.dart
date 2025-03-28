@@ -221,16 +221,12 @@ class _SearchPageState extends State<SearchPage> {
     return Scaffold(
       // AppBar semplificato
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02398E),
         title: Text(
           'Cerca luoghi',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
           ),
         ),
-        centerTitle: true,
-      ),
+
+
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(

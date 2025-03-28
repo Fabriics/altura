@@ -13,6 +13,7 @@ import 'package:flutter_open_app_settings/flutter_open_app_settings.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../models/place_model.dart';
+import '../../services/altura_loader.dart';
 import '../../services/auth_service.dart';
 import '../../services/places_service.dart';
 import 'edit/edit_place_page.dart';
@@ -870,7 +871,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       body: Stack(
         children: [
           if (_isLoading)
-            const Center(child: CircularProgressIndicator())
+            const Center(child: AlturaLoader())
           else
             _buildGoogleMap(),
 

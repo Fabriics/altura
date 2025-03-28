@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../models/place_model.dart';
+import '../../../services/altura_loader.dart';
 import '../place_details_page.dart';
 
 class FavoritesPage extends StatefulWidget {
@@ -21,8 +22,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
     _loadPlaces();
   }
 
-  /// Carica i documenti corrispondenti ai placeIds. Se la lista è vuota,
-  /// evitiamo la query whereIn (che genera errore) e restituiamo Future.value(null).
+  /// Carica i documenti corrispondenti ai placeIds.
+  /// Se la lista è vuota, evita la query whereIn (che genera errore)
+  /// e restituisce Future.value(null).
   void _loadPlaces() {
     if (widget.placeIds.isEmpty) {
       _placesFuture = Future.value(null);
@@ -36,33 +38,43 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Se placeIds è vuota, mostriamo subito un messaggio
+    final theme = Theme.of(context);
+
+    // Se la lista di placeIds è vuota, mostriamo subito un messaggio usando gli stili del tema.
     if (widget.placeIds.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          backgroundColor: const Color(0xFF02398E),
+          backgroundColor: theme.colorScheme.primary,
           elevation: 0,
           title: Text(
             'Preferiti',
-            style: Theme.of(context)
-                .textTheme
-                .bodyLarge
-                ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           centerTitle: true,
           iconTheme: const IconThemeData(color: Colors.white),
         ),
-        body: const Center(child: Text('Nessun segnaposto preferito')),
+        body: Center(
+          child: Text(
+            'Nessun segnaposto preferito',
+            style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+          ),
+        ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02398E),
+        backgroundColor: theme.colorScheme.primary,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Preferiti',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -71,15 +83,24 @@ class _FavoritesPageState extends State<FavoritesPage> {
         future: _placesFuture,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(child: Text('Errore di caricamento'));
+            return Center(
+              child: Text(
+                'Errore di caricamento',
+                style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+              ),
+            );
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: AlturaLoader());
           }
-
-          // Se _placesFuture == null oppure la query non ha trovato documenti
+          // Se non sono stati trovati documenti
           if (snapshot.data == null || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('Nessun segnaposto preferito'));
+            return Center(
+              child: Text(
+                'Nessun segnaposto preferito',
+                style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+              ),
+            );
           }
 
           final docs = snapshot.data!.docs;
@@ -91,7 +112,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListTile(
-                  // Immagine con bordi arrotondati
+                  // Immagine con bordi arrotondati.
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: (place.mediaUrls?.isNotEmpty == true)
@@ -108,28 +129,27 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       child: const Icon(Icons.photo, color: Colors.white70),
                     ),
                   ),
-                  // Titolo in nero
+                  // Titolo: utilizza lo stile bodyLarge del tema (o simile) per il testo.
                   title: Text(
                     place.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.black),
+                    style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
                   ),
-                  // Descrizione in nero
+                  // Sottotitolo: descrizione del luogo.
                   subtitle: Text(
                     place.description ?? '',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.black),
+                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
                   ),
                   onTap: () {
-                    // Apriamo PlaceDetailsPage
+                    // Naviga alla PlaceDetailsPage.
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => PlaceDetailsPage(place: place)),
                     ).then((_) {
-                      // Al ritorno, se l’utente ha tolto il cuore,
-                      // ricarichiamo la lista e ricostruiamo
+                      // Al ritorno, ricarica la lista (utile se l'utente ha rimosso il preferito).
                       _loadPlaces();
                       setState(() {});
                     });

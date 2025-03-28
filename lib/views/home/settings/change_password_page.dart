@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:altura/services/auth_service.dart';
+import '../../../services/altura_loader.dart';
 
 /// Pagina per il cambio della password.
 /// L'utente deve inserire la vecchia password, la nuova password e la conferma
@@ -13,7 +14,7 @@ class ChangePasswordPage extends StatefulWidget {
 }
 
 class _ChangePasswordPageState extends State<ChangePasswordPage> {
-  // Chiave per il form
+  // Chiave per il form, utile per validare i campi
   final _formKey = GlobalKey<FormState>();
 
   // Controller per i campi di testo: vecchia password, nuova password e conferma nuova password
@@ -29,13 +30,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   // Variabile per gestire lo stato di caricamento (per evitare richieste multiple)
   bool _isLoading = false;
 
-  // Istanza del service di autenticazione
+  // Istanza del service di autenticazione per gestire il cambio password
   final Auth _authService = Auth();
 
   /// Gestisce il cambio password:
-  /// - Valida i campi del form
-  /// - Chiama il metodo updatePassword del service, che si occupa della reautenticazione
-  ///   e dell'aggiornamento della password
+  /// 1. Valida i campi del form
+  /// 2. Chiama il metodo updatePassword del service, che gestisce la reautenticazione e l'aggiornamento
+  /// 3. Mostra un messaggio di successo o errore e, in caso di successo, torna alla schermata precedente
   Future<void> _handleChangePassword() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -46,13 +47,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         oldPassword: _oldPassword.text,
         newPassword: _newPassword.text,
       );
-      // Notifica di successo e ritorno alla schermata precedente
+      // Mostra un messaggio di conferma in caso di successo
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password aggiornata con successo!')),
       );
       Navigator.pop(context);
     } catch (e) {
-      // In caso di errore, mostra il messaggio di errore
+      // In caso di errore, mostra il messaggio di errore tramite SnackBar
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Errore: ${e.toString()}')),
       );
@@ -66,18 +67,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // L'AppBar utilizza il tema globale (appBarTheme) definito in app_theme
       appBar: AppBar(
-        title: Text(
-          'Cambia Password',
-          style: Theme.of(context)
-              .textTheme
-              .bodyLarge
-              ?.copyWith(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        title: const Text('Cambia Password'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -102,8 +94,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 },
                 decoration: InputDecoration(
                   hintText: "Vecchia Password",
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
-                  prefixIcon: Icon(Icons.lock, color: Theme.of(context).colorScheme.primary),
+                  // Usa lo stile hint definito nell'inputDecorationTheme del tema
+                  hintStyle: Theme.of(context).inputDecorationTheme.hintStyle,
+                  prefixIcon: Icon(
+                    Icons.lock,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscureOldPassword ? Icons.visibility_off : Icons.visibility,
@@ -115,10 +111,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       });
                     },
                   ),
+                  // Usa il fillColor e il border definiti nel tema
                   filled: true,
-                  fillColor: Colors.grey[200],
+                  fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(15),
                     borderSide: BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
@@ -138,8 +135,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 },
                 decoration: InputDecoration(
                   hintText: "Nuova Password",
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
-                  prefixIcon: Icon(Icons.lock, color: Theme.of(context).colorScheme.primary),
+                  hintStyle: Theme.of(context).inputDecorationTheme.hintStyle,
+                  prefixIcon: Icon(
+                    Icons.lock,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscureNewPassword ? Icons.visibility_off : Icons.visibility,
@@ -152,9 +152,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     },
                   ),
                   filled: true,
-                  fillColor: Colors.grey[200],
+                  fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(15),
                     borderSide: BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
@@ -177,8 +177,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 },
                 decoration: InputDecoration(
                   hintText: "Conferma Nuova Password",
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
-                  prefixIcon: Icon(Icons.lock, color: Theme.of(context).colorScheme.primary),
+                  hintStyle: Theme.of(context).inputDecorationTheme.hintStyle,
+                  prefixIcon: Icon(
+                    Icons.lock,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
@@ -191,9 +194,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     },
                   ),
                   filled: true,
-                  fillColor: Colors.grey[200],
+                  fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(15),
                     borderSide: BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
@@ -203,26 +206,30 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               // Pulsante per inviare il form di aggiornamento password
               Center(
                 child: ElevatedButton(
+                  // Disabilita il pulsante se è in caricamento
                   onPressed: _isLoading ? null : _handleChangePassword,
                   style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    // Usa il backgroundColor primario (Blu profondo) dal tema
                     backgroundColor: Theme.of(context).colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    // Imposta il padding coerente con il tema (verticale 12, orizzontale 24)
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                    // Bordo arrotondato a 20, come definito nel tema elevatedButtonTheme
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
+                  // Mostra il loader se in caricamento, altrimenti il testo del pulsante
                   child: _isLoading
                       ? const SizedBox(
                     height: 24,
                     width: 24,
-                    child: CircularProgressIndicator(),
+                    child: AlturaLoader(),
                   )
-                      : const Text(
+                      : Text(
                     "Aggiorna Password",
-                    style: TextStyle(
+                    // Usa lo stile titleLarge del tema per il testo, impostando il colore a bianco
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -236,7 +243,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   @override
   void dispose() {
-    // Dispose dei controller per liberare risorse
+    // Libera le risorse dei controller per i campi di testo
     _oldPassword.dispose();
     _newPassword.dispose();
     _confirmPassword.dispose();

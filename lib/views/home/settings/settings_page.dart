@@ -52,20 +52,27 @@ class _SettingsPageState extends State<SettingsPage> {
         required String title,
         required IconData icon,
         required List<Widget> content,
-      }
-      ) {
+      }) {
     return Column(
       key: ValueKey(sectionIndex),
       children: [
         ListTile(
-          leading: Icon(icon, color: const Color(0xFF0D47A1)),
+          leading: Icon(
+            icon,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           title: Text(
             title,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           trailing: Icon(
-            _expanded[sectionIndex] ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-            color: const Color(0xFF0D47A1),
+            _expanded[sectionIndex]
+                ? Icons.keyboard_arrow_up
+                : Icons.keyboard_arrow_down,
+            color: Theme.of(context).colorScheme.primary,
           ),
           onTap: () {
             setState(() {
@@ -78,7 +85,9 @@ class _SettingsPageState extends State<SettingsPage> {
         AnimatedSize(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
-          child: _expanded[sectionIndex] ? Column(children: content) : const SizedBox.shrink(),
+          child: _expanded[sectionIndex]
+              ? Column(children: content)
+              : const SizedBox.shrink(),
         ),
         const Divider(),
       ],
@@ -86,27 +95,42 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   /// Costruisce una ListTile generica, eventualmente disabilitata
-  Widget _buildListTile(String title, IconData icon, {required VoidCallback? onTap}) {
+  Widget _buildListTile(String title, IconData icon,
+      {required VoidCallback? onTap}) {
     final bool isDisabled = (onTap == null);
     return ListTile(
-      leading: Icon(icon, color: isDisabled ? Colors.grey : const Color(0xFF0D47A1)),
+      leading: Icon(
+        icon,
+        color: isDisabled
+            ? Colors.grey
+            : Theme.of(context).colorScheme.primary,
+      ),
       title: Text(
         title,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: isDisabled ? Colors.grey : Colors.black),
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: isDisabled ? Colors.grey : Colors.black,
+        ),
       ),
       onTap: onTap,
     );
   }
 
   /// Costruisce una ListTile dotata di uno switch
-  Widget _buildSwitchTile(String title, IconData icon, {required bool value, required ValueChanged<bool> onChanged}) {
+  Widget _buildSwitchTile(String title, IconData icon,
+      {required bool value, required ValueChanged<bool> onChanged}) {
     return ListTile(
-      leading: Icon(icon, color: const Color(0xFF0D47A1)),
-      title: Text(title, style: Theme.of(context).textTheme.bodyLarge),
+      leading: Icon(
+        icon,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+      title: Text(
+        title,
+        style: Theme.of(context).textTheme.bodyLarge,
+      ),
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF0D47A1),
+        activeColor: Theme.of(context).colorScheme.primary,
         activeTrackColor: Colors.grey[300],
         inactiveThumbColor: Colors.grey[800],
         inactiveTrackColor: Colors.grey[200],
@@ -118,16 +142,8 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Impostazioni',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color(0xFF02398E),
+        title: const Text('Impostazioni'),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -150,7 +166,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     // Da implementare
                   },
                 ),
-                // Naviga verso la pagina dedicata all'eliminazione dell'account
                 _buildListTile(
                   'Elimina Account',
                   Icons.delete,
@@ -174,7 +189,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   'Configura Notifiche',
                   Icons.settings,
                   onTap: _notificationsEnabled
-                      ? () => Navigator.pushNamed(context, '/notification_settings_page')
+                      ? () => Navigator.pushNamed(
+                      context, '/notification_settings_page')
                       : null,
                 ),
               ],
@@ -190,7 +206,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   Icons.brightness_6,
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Cambio tema non implementato.')),
+                      const SnackBar(
+                          content: Text('Cambio tema non implementato.')),
                     );
                   },
                 ),
@@ -199,7 +216,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   Icons.language,
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Selezione lingua non implementata.')),
+                      const SnackBar(
+                          content: Text('Selezione lingua non implementata.')),
                     );
                   },
                 ),
@@ -216,7 +234,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   Icons.security,
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Gestione permessi non implementata.')),
+                      const SnackBar(
+                          content: Text('Gestione permessi non implementata.')),
                     );
                   },
                 ),
@@ -225,7 +244,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   Icons.shield,
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Autenticazione 2FA non implementata.')),
+                      const SnackBar(
+                          content: Text('Autenticazione 2FA non implementata.')),
                     );
                   },
                 ),

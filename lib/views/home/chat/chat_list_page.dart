@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:altura/services/chat_service.dart';
+import '../../../services/altura_loader.dart';
 import 'chat_page.dart';
 
 class ChatListPage extends StatelessWidget {
@@ -20,7 +21,7 @@ class ChatListPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02398E),
+        automaticallyImplyLeading: false,
         title: Text(
           'Le mie chat',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -38,7 +39,7 @@ class ChatListPage extends StatelessWidget {
             return const Center(child: Text('Errore caricamento chat'));
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: AlturaLoader());
           }
 
           final docs = snapshot.data?.docs ?? [];
