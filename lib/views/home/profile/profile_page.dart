@@ -29,7 +29,7 @@ class ProfilePage extends StatelessWidget {
               color: Theme.of(context).colorScheme.onPrimary,
             ),
             onPressed: () {
-              Navigator.pushNamed(context, '/edit_profile');
+              Navigator.pushNamed(context, '/edit_profile_page');
             },
           ),
         ],
@@ -199,7 +199,7 @@ class ProfilePage extends StatelessWidget {
 /// Include anche un'opzione per espandere il testo se troppo lungo.
 class _AboutMeSection extends StatefulWidget {
   final AppUser user;
-  const _AboutMeSection({super.key, required this.user});
+  const _AboutMeSection({required this.user});
 
   @override
   State<_AboutMeSection> createState() => _AboutMeSectionState();
@@ -297,7 +297,7 @@ class _AboutMeSectionState extends State<_AboutMeSection> {
 /// I dati social vengono visualizzati con chip e righe in base ai valori presenti.
 class _InfoSection extends StatelessWidget {
   final AppUser user;
-  const _InfoSection({super.key, required this.user});
+  const _InfoSection({required this.user});
 
   @override
   Widget build(BuildContext context) {

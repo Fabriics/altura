@@ -36,7 +36,7 @@ class _MainScreenState extends State<MainScreen> {
 
     // Inizializziamo la lista di pagine
     _pages = const [
-      HomePage(),      // Pagina 0
+      MapPage(),      // Pagina 0
       RulesPage(),     // Pagina 1
       PilotPage(),     // Pagina 2
       ChatListPage(),  // Pagina 3
@@ -102,8 +102,6 @@ class _MainScreenState extends State<MainScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
               AlturaLoader(),
-              SizedBox(height: 16),
-              Text("Caricamento utente..."),
             ],
           ),
         ),
@@ -179,11 +177,11 @@ class _MainScreenState extends State<MainScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.rule),
-            label: 'Regole',
+            label: 'Regole UAS',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'Professionisti',
+            label: 'Piloti',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.chat),
@@ -213,7 +211,7 @@ class _MainScreenState extends State<MainScreen> {
                     // Logo
                     Image.asset(
                       'assets/logo/altura_logo_static.png',
-                      width: 150,
+                      width: 100,
                     ),
                     // Scritta
                     Text(

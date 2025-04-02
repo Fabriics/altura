@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../services/altura_loader.dart';
@@ -83,19 +84,19 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       // Chiude il dialog di caricamento.
       Navigator.of(context, rootNavigator: true).pop();
 
-      // Mostra un dialog di conferma dell'eliminazione e naviga alla pagina di login.
-      await showDialog(
+      // Mostra un CupertinoAlertDialog di conferma dell'eliminazione e naviga alla pagina di login.
+      await showCupertinoDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
+        builder: (ctx) => CupertinoAlertDialog(
           title: const Text("Account eliminato"),
           content: const Text(
             "Il tuo account è stato eliminato con successo. "
                 "Non potrai più recuperare i tuoi dati.",
           ),
           actions: [
-            TextButton(
+            CupertinoDialogAction(
               onPressed: () {
-                Navigator.of(ctx).pop(); // Chiude l'alert.
+                Navigator.of(ctx).pop(); // Chiude il dialog.
                 Navigator.of(context).pushReplacementNamed('/login_page');
               },
               child: const Text("OK"),
@@ -125,7 +126,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      // L'AppBar utilizza il tema globale (appBarTheme) per il background e le icone.
+      // L'AppBar utilizza il tema globale per il background e le icone.
       appBar: AppBar(
         title: const Text('Elimina account'),
       ),
@@ -178,21 +179,19 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                 ],
               ),
               const SizedBox(height: 24),
-              // Se l'account usa il provider "password", mostra un messaggio e i campi per la password.
+              // Se l'account usa il provider "password", mostra i campi per la password.
               if (_isPasswordProvider)
                 Text(
                   "Inserisci la password per procedere con l'eliminazione dell'account:",
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               if (_isPasswordProvider) const SizedBox(height: 16),
-              // Campo per la Password.
               if (_isPasswordProvider)
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    // Utilizza il fillColor definito nell'inputDecorationTheme per coerenza.
                     filled: true,
                     fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                     border: OutlineInputBorder(
@@ -202,7 +201,6 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   ),
                 ),
               if (_isPasswordProvider) const SizedBox(height: 16),
-              // Campo per la Conferma Password.
               if (_isPasswordProvider)
                 TextFormField(
                   controller: _confirmPasswordController,
@@ -243,7 +241,6 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    // Usa il colore di errore dal tema per il pulsante (tipicamente rossoAccent).
                     backgroundColor: Theme.of(context).colorScheme.error,
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                     shape: RoundedRectangleBorder(

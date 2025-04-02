@@ -173,7 +173,7 @@ class _LoginPageState extends State<LoginPage> {
                     // Logo dell'app.
                     Center(
                       child: Image.asset(
-                        'assets/logo.png',
+                        'assets/logo/altura_logo_static.png',
                         height: 100,
                       ),
                     ),

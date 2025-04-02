@@ -37,7 +37,7 @@ class PlacesController extends ChangeNotifier {
   Set<Marker> get markers => _markers;
 
   /// Carica icone personalizzate dagli asset.
- /* Future<void> _loadCustomIcons() async {
+  /* Future<void> _loadCustomIcons() async {
     try {
       _iconPanoramico = await BitmapDescriptor.assetImage(
         const ImageConfiguration(size: Size(48, 48)),
@@ -155,7 +155,9 @@ class PlacesController extends ChangeNotifier {
   /// Carica un file (foto o video) su Firebase Storage e restituisce l'URL.
   Future<String?> _uploadMediaFile(String placeId, File file) async {
     try {
-      final fileName = "${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}";
+      final fileName = DateTime.now().millisecondsSinceEpoch.toString() +
+          "_" +
+          file.path.split('/').last;
       final ref = _storage.ref().child('placeMedia/$placeId/$fileName');
       await ref.putFile(file);
       final downloadUrl = await ref.getDownloadURL();
@@ -229,11 +231,11 @@ class PlacesController extends ChangeNotifier {
   /// Seleziona più media (foto e video) dal device.
   Future<List<File>?> pickMedia() async {
     try {
-      final List<XFile> xfiles = await _imagePicker.pickMultiImage(
+      final List<XFile>? xfiles = await _imagePicker.pickMultiImage(
         maxWidth: 1024,
         maxHeight: 1024,
       );
-      if (xfiles.isNotEmpty) {
+      if (xfiles != null && xfiles.isNotEmpty) {
         return xfiles.map((xfile) => File(xfile.path)).toList();
       } else {
         return [];

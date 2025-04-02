@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
@@ -40,6 +41,23 @@ class _OnboardingPageState extends State<OnboardingPage> {
     'assets/onboarding/background_onboarding3.jpeg',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    // Controlla se l'onboarding è già stato completato
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkOnboardingStatus();
+    });
+  }
+
+  Future<void> _checkOnboardingStatus() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool seen = prefs.getBool('seenOnboarding') ?? false;
+    if (seen) {
+      Navigator.pushReplacementNamed(context, '/signup_page');
+    }
+  }
+
   /// Passa alla pagina successiva o, se è l'ultima, naviga alla pagina di registrazione.
   void _nextPage() {
     if (_currentIndex < _onboardingData.length - 1) {
@@ -51,8 +69,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
     }
   }
 
-  /// Naviga alla pagina di registrazione (o login).
-  void _goToLoginPage() {
+  /// Naviga alla pagina di registrazione (o login) salvando il flag di completamento.
+  Future<void> _goToLoginPage() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('seenOnboarding', true);
     Navigator.pushReplacementNamed(context, '/signup_page');
   }
 
@@ -135,13 +155,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     child: ElevatedButton(
                       onPressed: _nextPage,
                       style: ElevatedButton.styleFrom(
-                        // Usa il colore primario (blu profondo) dal tema.
                         backgroundColor: Theme.of(context).colorScheme.primary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        elevation: 0, // Design flat e minimalista.
+                        elevation: 0,
                       ),
                       child: Text(
                         _currentIndex == _onboardingData.length - 1 ? 'Sign In' : 'Next',

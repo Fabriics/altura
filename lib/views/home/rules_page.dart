@@ -1,10 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-// geolocator per ottenere coordinate e permessi
 import 'package:geolocator/geolocator.dart';
-// geocoding per fare reverse geocoding (lat/long -> isoCountryCode, etc.)
 import 'package:geocoding/geocoding.dart' as geo;
-
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/altura_loader.dart';
 
 class RulesPage extends StatefulWidget {
@@ -15,23 +13,12 @@ class RulesPage extends StatefulWidget {
 }
 
 class _RulesPageState extends State<RulesPage> {
-  /// Indica se stiamo caricando dati o meno
   bool _isLoading = true;
-
-  /// Se c’è stato un errore generico
   bool _hasError = false;
-
-  /// Messaggio di errore (se presente)
   String? _errorMessage;
-
-  /// Indica se l’utente ha un account premium
   bool _isPremium = false;
-
-  /// Se l’utente NON è premium, mostriamo solo la regola del suo paese
   String? _countryCode;
   Map<String, dynamic>? _countryData;
-
-  /// Se l’utente è premium, carichiamo tutte le regole
   List<Map<String, dynamic>> _allRules = [];
 
   @override
@@ -40,10 +27,6 @@ class _RulesPageState extends State<RulesPage> {
     _initLogic();
   }
 
-  /// Funzione principale che:
-  /// 1) Ottiene la posizione utente (via Geolocator)
-  /// 2) Fa reverse geocoding per scoprire isoCountryCode (es. "IT")
-  /// 3) Carica i dati da Firestore (solo il paese, oppure tutti se premium)
   Future<void> _initLogic() async {
     setState(() {
       _isLoading = true;
@@ -52,22 +35,15 @@ class _RulesPageState extends State<RulesPage> {
     });
 
     try {
-      // 1) Otteniamo la posizione utente
       final position = await _getUserPosition();
-
-      // 2) Reverse geocoding: otteniamo la isoCountryCode
       final code = await _getCountryCodeFromCoords(position.latitude, position.longitude);
-      if (code == null) {
-        throw Exception("Impossibile determinare il Paese dalla tua posizione.");
-      }
-      _countryCode = code; // Esempio: "IT", "US", "FR", ecc.
+      if (code == null) throw Exception("Impossibile determinare il Paese dalla tua posizione.");
 
-      // 3) Carichiamo le regole da Firestore
+      _countryCode = code;
+
       if (_isPremium) {
-        // Carichiamo TUTTI i doc
         await _loadAllRules();
       } else {
-        // Carichiamo solo quello corrispondente a _countryCode
         await _loadRuleForCountry(_countryCode!);
       }
 
@@ -83,48 +59,30 @@ class _RulesPageState extends State<RulesPage> {
     }
   }
 
-  /// Ottiene la posizione utente usando Geolocator,
-  /// gestendo i permessi e il servizio di localizzazione.
   Future<Position> _getUserPosition() async {
-    // Verifica se i servizi di localizzazione sono attivi
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      // Se non lo sono, possiamo avvisare l'utente o lanciare eccezione
-      throw Exception("Servizio di localizzazione disabilitato sul dispositivo.");
-    }
+    if (!serviceEnabled) throw Exception("Servizio di localizzazione disabilitato sul dispositivo.");
 
-    // Verifica i permessi
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      // Richiedi permessi
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception("Permesso di localizzazione negato dall'utente.");
-      }
+      if (permission == LocationPermission.denied) throw Exception("Permesso di localizzazione negato.");
     }
     if (permission == LocationPermission.deniedForever) {
       throw Exception("Permesso di localizzazione negato permanentemente.");
     }
 
-    // A questo punto i permessi sono concessi
-    // Recuperiamo la posizione effettiva
     return await Geolocator.getCurrentPosition();
   }
 
-  /// Converte lat/lng -> isoCountryCode (es. "IT") usando geocoding
   Future<String?> _getCountryCodeFromCoords(double lat, double lng) async {
     final placemarks = await geo.placemarkFromCoordinates(lat, lng);
     if (placemarks.isEmpty) return null;
-    final place = placemarks.first;
-    return place.isoCountryCode; // Esempio: "IT"
+    return placemarks.first.isoCountryCode;
   }
 
-  /// Carica tutti i documenti della collezione "flight_rules" da Firestore
   Future<void> _loadAllRules() async {
-    final querySnap = await FirebaseFirestore.instance
-        .collection('flight_rules')
-        .get();
-
+    final querySnap = await FirebaseFirestore.instance.collection('flight_rules').get();
     _allRules = querySnap.docs.map((doc) {
       final data = doc.data();
       return {
@@ -134,148 +92,132 @@ class _RulesPageState extends State<RulesPage> {
     }).toList();
   }
 
-  /// Carica il singolo documento corrispondente a [code] (isoCountryCode)
   Future<void> _loadRuleForCountry(String code) async {
-    final docSnap = await FirebaseFirestore.instance
-        .collection('flight_rules')
-        .doc(code)
-        .get();
+    final docSnap = await FirebaseFirestore.instance.collection('flight_rules').doc(code).get();
+    if (!docSnap.exists) throw Exception("Nessuna regola trovata per $code");
 
-    if (!docSnap.exists) {
-      throw Exception("Nessuna regola trovata per $code");
-    }
     _countryData = {
       'countryCode': docSnap.id,
       ...docSnap.data()!,
     };
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // 1) Se stiamo caricando
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-            automaticallyImplyLeading: false,
-            title: const Text("Regole di Volo")
-      ),
-        body: const Center(child: AlturaLoader()),
-      );
-    }
-
-    // 2) Se c'è un errore
-    if (_hasError) {
-      return Scaffold(
-        appBar: AppBar(
-            automaticallyImplyLeading: false,
-            title: const Text("Regole di Volo")
-        ),
-        body: Center(
-          child: Text(
-            _errorMessage ?? "Errore sconosciuto",
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    // 3) Se l’utente NON è premium -> mostriamo la regola di un singolo Paese
-    if (!_isPremium) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text("Regole di Volo"),
-          centerTitle: true,
-        ),
-        body: _buildCountryCard(_countryData!),
-      );
-    }
-
-    // 4) Se l'utente è premium -> mostriamo la lista di tutti i Paesi
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Regole di Volo (Premium)"),
-        centerTitle: true,
-      ),
-      body: ListView.builder(
-        itemCount: _allRules.length,
-        itemBuilder: (context, index) {
-          final item = _allRules[index];
-          return _buildCountryCard(item);
-        },
+  Widget _buildDisclaimer(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Text(
+        "Le informazioni riportate hanno solo valore indicativo e non costituiscono una fonte ufficiale. "
+            "Per una corretta interpretazione e applicazione delle normative, si invita a fare sempre riferimento all'autorità aeronautica competente del paese di riferimento.",
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
       ),
     );
   }
 
-  /// Costruisce una card “moderna” con le info del Paese:
-  /// - Nome Paese
-  /// - Autorità
-  /// - Altitudine max
-  /// - Link ufficiale
-  /// - e ovviamente le regole
-  Widget _buildCountryCard(Map<String, dynamic> data) {
-    final countryName = data['countryName'] ?? data['countryCode'];
-    final rules = data['rules'] ?? 'Nessuna regola disponibile.';
-    final authority = data['authorityName'] ?? 'N/A';
-    final maxAlt = data['maxAltitude']?.toString() ?? 'N/A';
-    final officialLink = data['officialLink'] as String?;
+  Widget _buildRegulationCard(Map<String, dynamic> data) {
+    final country = data['countryName'] ?? data['countryCode'];
+    final flagUrl = data['flag'] ?? "";
+    final canFly = data['canFlyRecreational'] == true ? '✅' : '❌';
+    final registered = data['registrationRequired'] == true ? '✅' : '❌';
+    final patent = data['licenseRequired'] == true ? '✅' : '❌';
+    final alt = data['maxAltitude']?.toString() ?? 'N/A';
+    final description = data['description'] ?? "";
+    final official = data['authorityLink'];
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            // Nome del Paese
-            Text(
-              countryName,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            if (flagUrl.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.network(flagUrl, width: 40, height: 28, fit: BoxFit.cover),
               ),
-            ),
-            const SizedBox(height: 8),
-
-            // Riga con Autorità e altitudine massima
-            Row(
-              children: [
-                const Icon(Icons.admin_panel_settings, size: 18, color: Colors.blueGrey),
-                const SizedBox(width: 4),
-                Text("Autorità: $authority"),
-                const Spacer(),
-                const Icon(Icons.flight_takeoff, size: 18, color: Colors.blueGrey),
-                const SizedBox(width: 4),
-                Text("Max Alt: $maxAlt m"),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Testo delle regole
+            const SizedBox(width: 8),
             Text(
-              rules,
-              style: const TextStyle(fontSize: 15, height: 1.3),
+              country,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
-
-            // Link ufficiale, se presente
-            if (officialLink != null && officialLink.isNotEmpty)
-              InkWell(
-                onTap: () {
-                  // Apri link nel browser (es. con url_launcher)
-                  // Esempio:
-                  // launchUrl(Uri.parse(officialLink));
-                },
-                child: Text(
-                  officialLink,
-                  style: const TextStyle(
-                    color: Colors.blue,
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
-              ),
           ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("📌 Volo ricreativo consentito: $canFly"),
+              Text("📝 Registrazione obbligatoria: $registered"),
+              Text("📄 Richiede attestato: $patent"),
+              Text("🛫 Altezza massima: $alt m"),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          "Descrizione dettagliata",
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          description,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
+        ),
+        const SizedBox(height: 24),
+        if (official != null && official.isNotEmpty)
+          TextButton.icon(
+            onPressed: () async {
+              final uri = Uri.parse(official);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+            icon: const Icon(Icons.open_in_new),
+            label: const Text("Vai al sito ufficiale dell'autorità"),
+          ),
+        _buildDisclaimer(context),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Regole di Volo")),
+        body: const Center(child: AlturaLoader()),
+      );
+    }
+
+    if (_hasError) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Regole di Volo")),
+        body: Center(child: Text(_errorMessage ?? "Errore sconosciuto")),
+      );
+    }
+
+    if (!_isPremium) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Normativa di volo")),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: _buildRegulationCard(_countryData!),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Normative mondiali (Premium)")),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _allRules.length,
+        itemBuilder: (context, index) => Padding(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: _buildRegulationCard(_allRules[index]),
         ),
       ),
     );

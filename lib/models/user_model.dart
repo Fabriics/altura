@@ -23,7 +23,6 @@ class AppUser {
   final String? youtube;
   final String? website;
   final String? fcmToken;
-
   final double? latitude;
   final double? longitude;
 

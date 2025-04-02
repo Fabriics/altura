@@ -132,9 +132,6 @@ class SettingsService {
       // 6) Chiudi dialog e naviga al login
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // Chiude il dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account eliminato con successo!')),
-        );
         Navigator.of(context).pushReplacementNamed('/login_page');
       }
     } catch (e, stacktrace) {

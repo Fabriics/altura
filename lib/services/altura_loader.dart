@@ -33,7 +33,7 @@ class _AlturaLoaderState extends State<AlturaLoader>
         turns: _controller,
         child: Image.asset(
           'assets/logo/altura_logo_loader.png',
-          width: 60,
+          width: 80,
         ),
       ),
     );

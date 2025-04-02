@@ -1,10 +1,12 @@
 import 'dart:io';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../../models/place_model.dart';
-import '../../../services/places_service.dart';
+import '../../../services/map_service.dart';
+import '../../../services/place_controller.dart';
 
+
+// Dropdown per la selezione della categoria, usato nella UI.
 const List<DropdownMenuItem<String>> kCategoryItems = [
   DropdownMenuItem(value: 'pista_decollo', child: Text('Pista di decollo')),
   DropdownMenuItem(value: 'area_volo_libera', child: Text('Area volo libera')),
@@ -23,40 +25,49 @@ class EditPlacePage extends StatefulWidget {
 }
 
 class _EditPlacePageState extends State<EditPlacePage> {
-  // Gestione campi
+  // Gestione dei campi di testo e della categoria selezionata.
   late String _selectedCategory;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
-  // Media esistenti (sia file locali che URL remoti)
+  // Media esistenti: file locali e URL remoti.
   final List<File> _existingMediaFiles = [];
   final List<String> _existingMediaUrls = [];
 
-  // Nuovi media selezionati
+  // Nuovi media aggiunti.
   final List<File> _pickedMedia = [];
 
-  // Controller per la selezione dei media
+  // Controller per la selezione dei media.
   final PlacesController _placesController = PlacesController();
+  late final MapService _mapService;
 
   @override
   void initState() {
     super.initState();
-
-    // Inizializziamo i campi con i dati esistenti del segnaposto
+    // Inizializza i campi con i dati del segnaposto esistente.
     _selectedCategory = widget.place.category;
     _titleController.text = widget.place.name;
     _descriptionController.text = widget.place.description ?? '';
 
-    // Popoliamo le liste con i media esistenti
+    // Popola le liste dei media esistenti.
     if (widget.place.mediaFiles != null && widget.place.mediaFiles!.isNotEmpty) {
       _existingMediaFiles.addAll(widget.place.mediaFiles!);
     }
     if (widget.place.mediaUrls != null && widget.place.mediaUrls!.isNotEmpty) {
       _existingMediaUrls.addAll(widget.place.mediaUrls!);
     }
+
+    // Inizializza il MapService con il PlacesController.
+    _mapService = MapService(placesController: _placesController);
   }
 
-  /// Seleziona nuovi media da galleria/fotocamera
+  /// Delega l'eliminazione del segnaposto al MapService e torna alla pagina precedente.
+  Future<void> _deletePlace(Place place) async {
+    await _mapService.deletePlace(place: place, context: context);
+    Navigator.pop(context);
+  }
+
+  /// Seleziona nuovi media dalla galleria o dalla fotocamera.
   Future<void> _pickNewMedia() async {
     final media = await _placesController.pickMedia();
     if (media != null && media.isNotEmpty) {
@@ -66,7 +77,7 @@ class _EditPlacePageState extends State<EditPlacePage> {
     }
   }
 
-  /// Elimina un media esistente (URL o file) dalla lista
+  /// Rimuove un media esistente (file o URL) dalla lista.
   void _removeExistingMedia(int index, bool isUrl) {
     setState(() {
       if (isUrl) {
@@ -77,50 +88,40 @@ class _EditPlacePageState extends State<EditPlacePage> {
     });
   }
 
-  /// Elimina un media appena aggiunto
+  /// Rimuove un media appena aggiunto.
   void _removePickedMedia(int index) {
     setState(() {
       _pickedMedia.removeAt(index);
     });
   }
 
-  /// Annulla la modifica e torna alla pagina precedente
+  /// Annulla la modifica e torna alla pagina precedente.
   void _cancelEdit() {
     Navigator.of(context).pop(null);
   }
 
-  /// Salva le modifiche e torna con i dati aggiornati
+  /// Salva le modifiche e passa i dati aggiornati alla pagina precedente.
   void _saveEdit() {
-    // Per la logica di salvataggio, potresti unire le due liste di media esistenti
-    // e quelle nuove, oppure passare entrambe per poi gestirle nel tuo controller.
-    // In questo esempio passiamo solo i NUOVI media, come da codice originale.
-    // Se vuoi anche aggiornare la rimozione dei media esistenti, devi gestirlo
-    // nel tuo `updatePlace`, ad esempio passando un "existingMediaToRemove".
+    // In questo esempio passiamo solo i nuovi media; puoi decidere di passare anche le liste aggiornate degli esistenti.
     Navigator.of(context).pop({
       'category': _selectedCategory,
       'title': _titleController.text,
       'description': _descriptionController.text,
       'media': _pickedMedia,
-      // Esempio: potresti passare anche le liste aggiornate:
-      // 'remainingUrls': _existingMediaUrls,
-      // 'remainingFiles': _existingMediaFiles,
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Verifica se l'utente corrente è il proprietario del segnaposto.
     final bool isOwner = widget.place.userId == FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02398E),
+        backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
         title: Text(
-          'Impostazioni',
-          style: Theme.of(context)
-              .textTheme
-              .bodyLarge
-              ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+          'Modifica segnaposto',
         ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -128,11 +129,10 @@ class _EditPlacePageState extends State<EditPlacePage> {
           if (isOwner)
             IconButton(
               icon: const Icon(Icons.delete),
-              onPressed: () {
-                // Logica per eliminare il segnaposto (opzionale)
-                debugPrint('Elimina segnaposto');
+              onPressed: () async {
+                await _deletePlace(widget.place);
               },
-            )
+            ),
         ],
       ),
       body: SafeArea(
@@ -141,11 +141,14 @@ class _EditPlacePageState extends State<EditPlacePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1) Media esistenti (con "X" per eliminarli)
+              // Sezione Media esistenti con pulsante "X" per eliminare ciascun media.
               if (_existingMediaFiles.isNotEmpty || _existingMediaUrls.isNotEmpty) ...[
-                const Text(
+                Text(
                   'Media caricati',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 SizedBox(
@@ -153,7 +156,7 @@ class _EditPlacePageState extends State<EditPlacePage> {
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
-                      // Mostra i file locali esistenti
+                      // Mostra i file locali esistenti.
                       for (int i = 0; i < _existingMediaFiles.length; i++)
                         Stack(
                           children: [
@@ -183,7 +186,7 @@ class _EditPlacePageState extends State<EditPlacePage> {
                             ),
                           ],
                         ),
-                      // Mostra i link remoti esistenti
+                      // Mostra i link remoti esistenti.
                       for (int i = 0; i < _existingMediaUrls.length; i++)
                         Stack(
                           children: [
@@ -218,8 +221,7 @@ class _EditPlacePageState extends State<EditPlacePage> {
                 ),
                 const SizedBox(height: 20),
               ],
-
-              // 2) Pulsante per aggiungere nuovi media
+              // Pulsante per aggiungere nuovi media.
               ElevatedButton(
                 onPressed: _pickNewMedia,
                 style: ElevatedButton.styleFrom(
@@ -236,8 +238,7 @@ class _EditPlacePageState extends State<EditPlacePage> {
                 ),
               ),
               const SizedBox(height: 8),
-
-              // Anteprima dei nuovi media
+              // Anteprima dei nuovi media aggiunti.
               if (_pickedMedia.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 SizedBox(
@@ -279,18 +280,20 @@ class _EditPlacePageState extends State<EditPlacePage> {
                 ),
               ],
               const SizedBox(height: 24),
-
-              // 3) Campo titolo
-              const Text(
+              // Campo Titolo.
+              Text(
                 'Titolo',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 4),
               TextField(
                 controller: _titleController,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.grey[200],
+                  fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -298,20 +301,22 @@ class _EditPlacePageState extends State<EditPlacePage> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // 4) Campo descrizione
-              const Text(
+              // Campo Descrizione.
+              Text(
                 'Descrizione',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 4),
               TextField(
                 controller: _descriptionController,
                 minLines: 3,
-                maxLines: 8,
+                maxLines: 20,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.grey[200],
+                  fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -319,11 +324,13 @@ class _EditPlacePageState extends State<EditPlacePage> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // 5) Campo categoria (UI migliorata con DropdownButtonFormField)
-              const Text(
+              // Campo Categoria tramite Dropdown.
+              Text(
                 'Categoria',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 4),
               DropdownButtonFormField<String>(
@@ -331,7 +338,7 @@ class _EditPlacePageState extends State<EditPlacePage> {
                 items: kCategoryItems,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.grey[200],
+                  fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -345,12 +352,10 @@ class _EditPlacePageState extends State<EditPlacePage> {
                 },
               ),
               const SizedBox(height: 24),
-
-              // 6) Pulsanti in fondo (Annulla a sinistra in rosso, Salva a destra in blu)
+              // Pulsanti in fondo: "Annulla" a sinistra, "Salva" a destra.
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Pulsante Annulla
                   OutlinedButton(
                     onPressed: _cancelEdit,
                     style: OutlinedButton.styleFrom(
@@ -362,12 +367,10 @@ class _EditPlacePageState extends State<EditPlacePage> {
                     ),
                     child: const Text('Annulla', style: TextStyle(fontSize: 16)),
                   ),
-
-                  // Pulsante Salva
                   ElevatedButton(
                     onPressed: _saveEdit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

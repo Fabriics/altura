@@ -13,20 +13,16 @@ class EditProfilePage extends StatefulWidget {
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
-  // Chiave per il form
   final _formKey = GlobalKey<FormState>();
 
-  // Controller per i campi di testo
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _websiteController = TextEditingController();
   final TextEditingController _instagramController = TextEditingController();
   final TextEditingController _youtubeController = TextEditingController();
   final TextEditingController _flightExperienceController = TextEditingController();
-  // Nuovo: Controller per la località
   final TextEditingController _locationController = TextEditingController();
 
-  // Gestione dei droni selezionati
   final Set<String> _selectedDrones = {};
   final List<String> _availableDrones = [
     'DJI Mini 3 Pro',
@@ -37,7 +33,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     'Altro',
   ];
 
-  // URL dell’immagine profilo attuale
   String? _profileImageUrl;
 
   @override
@@ -46,7 +41,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _loadUserData();
   }
 
-  /// Carica i dati utente da Firestore e popola i campi del form.
   Future<void> _loadUserData() async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -77,7 +71,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  /// Permette all’utente di selezionare o sostituire la foto profilo.
   Future<void> _uploadProfileImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -87,13 +80,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
         if (uid == null) return;
 
         final File imageFile = File(pickedFile.path);
-        // Carica l'immagine su Firebase Storage
         final storageRef = FirebaseStorage.instance.ref().child('profile_images').child('$uid.jpg');
         final uploadTask = storageRef.putFile(imageFile);
         final snapshot = await uploadTask;
         final downloadUrl = await snapshot.ref.getDownloadURL();
 
-        // Aggiorna l'URL in Firestore
         await FirebaseFirestore.instance.collection('users').doc(uid).update({
           'profileImageUrl': downloadUrl,
         });
@@ -106,7 +97,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  /// Aggiorna i dati del profilo su Firestore.
   Future<void> _updateProfile() async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -130,7 +120,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  /// Mostra un dialog per selezionare i droni.
   void _showDroneSelectionDialog() {
     showDialog(
       context: context,
@@ -182,7 +171,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  /// Costruisce un TextFormField generico allineato allo stile dell'app.
   Widget _buildTextField({
     required TextEditingController controller,
     required String labelText,
@@ -197,14 +185,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
       keyboardType: keyboardType,
       decoration: InputDecoration(
         filled: true,
-        fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[200],
+        fillColor: Theme.of(context).cardColor,
         labelText: labelText,
         hintText: hintText,
         labelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
-        hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
+        hintStyle: TextStyle(color: Theme.of(context).hintColor),
         prefixIcon: icon != null ? Icon(icon, color: Theme.of(context).colorScheme.primary) : null,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
       ),
@@ -227,197 +215,157 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      // AppBar: utilizza il colore primario del tema e titoli in bianco.
       appBar: AppBar(
-        backgroundColor: theme.colorScheme.primary,
-        elevation: 0,
         title: Text(
           'Modifica Profilo',
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
         ),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+          color: theme.colorScheme.onPrimary,
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.save),
+            icon: const Icon(Icons.check),
             onPressed: () async {
               if (_formKey.currentState?.validate() ?? false) {
                 await _updateProfile();
               }
             },
+            color: theme.colorScheme.onPrimary,
           )
         ],
       ),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                // Sezione foto profilo
-                Center(
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.grey[300],
-                        backgroundImage: (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
-                            ? NetworkImage(_profileImageUrl!)
-                            : null,
-                        child: (_profileImageUrl == null || _profileImageUrl!.isEmpty)
-                            ? Icon(
-                          Icons.person,
-                          size: 60,
-                          color: theme.colorScheme.onSurface,
-                        )
-                            : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: _uploadProfileImage,
-                          child: CircleAvatar(
-                            radius: 18,
-                            backgroundColor: theme.colorScheme.primary,
-                            child: Icon(
-                              Icons.camera_alt,
-                              size: 18,
-                              color: theme.colorScheme.onPrimary,
-                            ),
-                          ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 60,
+                      backgroundColor: theme.colorScheme.surfaceVariant,
+                      backgroundImage: (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
+                          ? NetworkImage(_profileImageUrl!)
+                          : null,
+                      child: (_profileImageUrl == null || _profileImageUrl!.isEmpty)
+                          ? Icon(Icons.person, size: 60, color: theme.colorScheme.onSurface)
+                          : null,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _uploadProfileImage,
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: theme.colorScheme.primary,
+                          child: Icon(Icons.camera_alt, color: theme.colorScheme.onPrimary, size: 20),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Username
-                _buildTextField(
-                  controller: _usernameController,
-                  labelText: "Username",
-                  hintText: "Inserisci il tuo username",
-                  icon: Icons.person,
-                ),
-                const SizedBox(height: 24),
-                // Biografia
-                _buildTextField(
-                  controller: _bioController,
-                  labelText: "Biografia",
-                  hintText: "Scrivi una breve biografia su di te",
-                  icon: Icons.info,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 24),
-                // Località
-                _buildTextField(
-                  controller: _locationController,
-                  labelText: "Località",
-                  hintText: "Es. Roma, Italia",
-                  icon: Icons.location_on,
-                ),
-                const SizedBox(height: 24),
-                // Selezione droni
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "I tuoi droni:",
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              _buildTextField(
+                controller: _usernameController,
+                labelText: "Username",
+                hintText: "Inserisci il tuo username",
+                icon: Icons.person,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _bioController,
+                labelText: "Su di te",
+                hintText: "Scrivi qualcosa su di te...",
+                icon: Icons.info_outline,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _locationController,
+                labelText: "Località",
+                hintText: "Es. Roma, Italia",
+                icon: Icons.location_on,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _flightExperienceController,
+                labelText: "Esperienza di volo (anni)",
+                hintText: "Es. 2",
+                icon: Icons.flight,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _websiteController,
+                labelText: "Sito web",
+                hintText: "https://iltuosito.com",
+                icon: Icons.link,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _instagramController,
+                labelText: "Instagram",
+                hintText: "@iltuonomeutente",
+                icon: Icons.camera_alt_outlined,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _youtubeController,
+                labelText: "Canale YouTube",
+                hintText: "Link al tuo canale",
+                icon: Icons.ondemand_video,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Droni posseduti:",
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: _selectedDrones.map((drone) {
+                  return Chip(
+                    label: Text(drone),
+                    onDeleted: () => setState(() => _selectedDrones.remove(drone)),
+                  );
+                }).toList(),
+              ),
+              TextButton.icon(
+                onPressed: _showDroneSelectionDialog,
+                icon: const Icon(Icons.add),
+                label: const Text("Aggiungi droni"),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () async {
+                  if (_formKey.currentState?.validate() ?? false) {
+                    await _updateProfile();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8.0,
-                  children: _selectedDrones.map((drone) {
-                    return Chip(
-                      label: Text(drone),
-                      deleteIcon: Icon(Icons.close, color: theme.colorScheme.primary),
-                      onDeleted: () {
-                        setState(() => _selectedDrones.remove(drone));
-                      },
-                      backgroundColor: Colors.grey[200],
-                      labelStyle: TextStyle(color: theme.colorScheme.primary),
-                    );
-                  }).toList(),
-                ),
-                ElevatedButton(
-                  onPressed: _showDroneSelectionDialog,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text("Scegli i droni"),
-                ),
-                const SizedBox(height: 24),
-                // Sito Web
-                _buildTextField(
-                  controller: _websiteController,
-                  labelText: "Sito Web",
-                  hintText: "https://iltuosito.com",
-                  icon: Icons.web,
-                  keyboardType: TextInputType.url,
-                ),
-                const SizedBox(height: 24),
-                // Instagram
-                _buildTextField(
-                  controller: _instagramController,
-                  labelText: "Instagram",
-                  hintText: "@iltuonomeutente",
-                  icon: Icons.camera_alt,
-                ),
-                const SizedBox(height: 24),
-                // YouTube
-                _buildTextField(
-                  controller: _youtubeController,
-                  labelText: "Canale YouTube",
-                  hintText: "Link al tuo canale YouTube",
-                  icon: Icons.video_library,
-                ),
-                const SizedBox(height: 24),
-                // Esperienza di volo
-                _buildTextField(
-                  controller: _flightExperienceController,
-                  labelText: "Esperienza di volo (Anni)",
-                  hintText: "es. 2",
-                  icon: Icons.flight,
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 40),
-                // Bottone Salva Modifiche.
-                ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState?.validate() ?? false) {
-                      await _updateProfile();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: theme.colorScheme.primary,
-                  ),
-                  child: Text(
-                    "Salva Modifiche",
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.onPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                child: Text(
+                  "Salva Modifiche",
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ],
-            ),
+              )
+            ],
           ),
         ),
       ),

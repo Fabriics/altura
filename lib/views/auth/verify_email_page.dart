@@ -55,8 +55,8 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
       msg: message,
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.black87,
       textColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.primary,
       fontSize: 16.0,
     );
   }

@@ -1,12 +1,12 @@
-import 'package:altura/services/places_service.dart';
 import 'package:altura/services/chat_service.dart';
+import 'package:altura/services/map_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../models/place_model.dart';
-import 'edit/edit_place_page.dart';
+import '../../services/place_controller.dart';
 import 'chat/chat_page.dart';
 
 class PlaceDetailsPage extends StatefulWidget {
@@ -25,12 +25,15 @@ class PlaceDetailsPage extends StatefulWidget {
 
 class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   String _username = 'Sconosciuto';
+  String? _profileImageUrl; // Variabile per l'immagine del profilo
   bool _isFavorite = false;
+  late final MapService _mapService;
   final ChatService _chatService = ChatService();
 
   @override
   void initState() {
     super.initState();
+    _mapService = MapService(placesController: PlacesController());
     if (widget.username != null) {
       _username = widget.username!;
     } else {
@@ -46,7 +49,10 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
           .doc(widget.place.userId)
           .get();
       if (doc.exists && doc.data() != null) {
-        setState(() => _username = doc.data()!['username'] ?? 'Senza nome');
+        setState(() {
+          _username = doc.data()!['username'] ?? 'Senza nome';
+          _profileImageUrl = doc.data()!['profileImageUrl'] ?? '';
+        });
       }
     } catch (e) {
       debugPrint('Errore nel recuperare il nome utente: $e');
@@ -56,7 +62,8 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   Future<void> _checkFavorite() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final doc =
+    await FirebaseFirestore.instance.collection('users').doc(uid).get();
     final favs = (doc.data()?['favoritePlaces'] as List<dynamic>?)?.cast<String>() ?? [];
     setState(() => _isFavorite = favs.contains(widget.place.id));
   }
@@ -76,39 +83,18 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   Future<void> _contactUser() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Devi essere loggato')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Devi essere loggato')));
       return;
     }
     final otherUid = widget.place.userId;
     final chatId = await _chatService.createOrGetChat(otherUid);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(chatId: chatId)));
-  }
-
-  Future<void> _deletePlace() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Conferma Eliminazione'),
-        content: Text('Eliminare il segnaposto "${widget.place.name}"?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annulla')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Elimina', style: TextStyle(color: Colors.red))),
-        ],
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ChatPage(chatId: chatId)),
     );
-    if (confirmed == true) {
-      await PlacesController().deletePlace(widget.place.id);
-      Navigator.pop(context);
-    }
   }
 
-  /// Funzione per aprire il media in fullscreen
   void _openFullScreenMedia({required Widget mediaWidget}) {
     Navigator.push(
       context,
@@ -120,25 +106,32 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isOwner = widget.place.userId == FirebaseAuth.instance.currentUser?.uid;
+    final theme = Theme.of(context);
+    final bool isOwner =
+        widget.place.userId == FirebaseAuth.instance.currentUser?.uid;
     final relativeTime = widget.place.createdAt != null
         ? timeago.format(widget.place.createdAt!)
         : '';
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02398E),
-        title: Text(
-          'Segnaposto',
-          style: Theme.of(context)
-              .textTheme
-              .bodyLarge
-              ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
+        title: const Text("Segnaposto"),
+        actions: [
+          // Se l'utente è proprietario, mostra il pulsante per modificare il segnaposto.
+          if (isOwner)
+            IconButton(
+              icon: Icon(
+                Icons.edit,
+                color: theme.colorScheme.onPrimary,
+              ),
+              onPressed: () async {
+                await _mapService.editPlace(place: widget.place, context: context);
+                setState(() {});
+              },
+            ),
+        ],
       ),
       backgroundColor: Colors.white,
-      // Mostra il pulsante "Contatta utente" solo se l'utente non è il proprietario
       bottomNavigationBar: !isOwner
           ? SafeArea(
         child: Padding(
@@ -150,7 +143,8 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
               backgroundColor: const Color(0xFF02398E),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: _contactUser,
           ),
@@ -160,98 +154,83 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: Card(
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            elevation: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: SizedBox(
-                        height: 250,
-                        width: double.infinity,
-                        child: _buildMediaCarousel(widget.place),
-                      ),
-                    ),
-                    // Icona per il "Favorite" in alto a destra
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: IconButton(
-                        icon: Icon(
-                          _isFavorite
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          size: 30,
-                          color: _isFavorite ? Colors.redAccent : Colors.white,
-                        ),
-                        onPressed: _toggleFavorite,
-                      ),
-                    ),
-                    // Icone "Modifica" ed "Elimina" posizionate in basso a destra se l'utente è il proprietario
-                    if (isOwner)
-                      Positioned(
-                        bottom: 16,
-                        right: 16,
-                        child: Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.white),
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => EditPlacePage(place: widget.place),
-                                ),
-                              ).then((_) => setState(() {})),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.redAccent),
-                              onPressed: _deletePlace,
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Media carousel
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: SizedBox(
+                  height: 280,
+                  width: double.infinity,
+                  child: _buildMediaCarousel(widget.place),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  // Visualizza l'immagine del profilo se esiste, altrimenti un placeholder.
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundImage: (_profileImageUrl != null &&
+                        _profileImageUrl!.isNotEmpty)
+                        ? NetworkImage(_profileImageUrl!)
+                        : null,
+                    child: (_profileImageUrl == null ||
+                        _profileImageUrl!.isEmpty)
+                        ? Icon(Icons.person,
+                        size: 60, color: theme.colorScheme.onSurface)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.place.name,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text('Pubblicato da $_username',
-                          style: Theme.of(context).textTheme.bodyMedium),
-                      if (relativeTime.isNotEmpty)
-                        Text('Caricato $relativeTime',
-                            style: Theme.of(context).textTheme.bodySmall),
-                      const Divider(height: 32),
-                      if (widget.place.description?.isNotEmpty ?? false)
-                        Text(widget.place.description!,
-                            style: Theme.of(context).textTheme.bodyLarge),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 18, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(
-                              '${widget.place.latitude.toStringAsFixed(5)}, ${widget.place.longitude.toStringAsFixed(5)}',
-                              style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                        ],
+                      Text(
+                        _username,
+                        style: theme.textTheme.titleMedium,
                       ),
+                      if (relativeTime.isNotEmpty)
+                        Text(
+                          'Pubblicato $relativeTime',
+                          style: theme.textTheme.bodySmall,
+                        ),
                     ],
                   ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(
+                      _isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: _isFavorite ? Colors.redAccent : Colors.grey,
+                    ),
+                    onPressed: _toggleFavorite,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text(
+                widget.place.name,
+                style:
+                theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              if (widget.place.description?.isNotEmpty ?? false)
+                Text(
+                  widget.place.description!,
+                  style: theme.textTheme.bodyLarge,
                 ),
-              ],
-            ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.location_on, size: 18, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${widget.place.latitude.toStringAsFixed(5)}, ${widget.place.longitude.toStringAsFixed(5)}',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -259,38 +238,36 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   }
 
   Widget _buildMediaCarousel(Place place) {
-    // Se sono presenti file locali
-    if ((place.mediaFiles?.isNotEmpty ?? false)) {
+    if (place.mediaFiles?.isNotEmpty ?? false) {
       return PageView.builder(
         itemCount: place.mediaFiles!.length,
         itemBuilder: (_, i) => GestureDetector(
           onTap: () => _openFullScreenMedia(
             mediaWidget: Image.file(
               place.mediaFiles![i],
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
             ),
           ),
           child: Image.file(
             place.mediaFiles![i],
-            fit: BoxFit.contain,
+            fit: BoxFit.cover,
           ),
         ),
       );
     }
-    // Se sono presenti URL remoti
-    if ((place.mediaUrls?.isNotEmpty ?? false)) {
+    if (place.mediaUrls?.isNotEmpty ?? false) {
       return PageView.builder(
         itemCount: place.mediaUrls!.length,
         itemBuilder: (_, i) => GestureDetector(
           onTap: () => _openFullScreenMedia(
             mediaWidget: Image.network(
               place.mediaUrls![i],
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
             ),
           ),
           child: Image.network(
             place.mediaUrls![i],
-            fit: BoxFit.contain,
+            fit: BoxFit.cover,
           ),
         ),
       );
@@ -304,11 +281,10 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   }
 }
 
-/// Widget per visualizzare il media in fullscreen
 class FullScreenMediaPage extends StatelessWidget {
   final Widget mediaWidget;
 
-  const FullScreenMediaPage({Key? key, required this.mediaWidget}) : super(key: key);
+  const FullScreenMediaPage({super.key, required this.mediaWidget});
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +292,6 @@ class FullScreenMediaPage extends StatelessWidget {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        elevation: 0,
       ),
       body: Center(child: mediaWidget),
     );
