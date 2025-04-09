@@ -72,7 +72,7 @@ class _LoginPageState extends State<LoginPage> {
     });
     try {
       await _authService.signInWithGoogle();
-      Navigator.pushReplacementNamed(context, '/main_screen');
+      Navigator.pushReplacementNamed(context, '/complete_profile');
     } on FirebaseAuthException catch (error) {
       setState(() {
         _loginError = "Errore durante il login con Google: ${error.message}";
@@ -152,7 +152,7 @@ class _LoginPageState extends State<LoginPage> {
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/background_onboarding4.jpg'),
+                image: AssetImage('assets/onboarding/background_onboarding4.jpg'),
                 fit: BoxFit.cover,
               ),
             ),

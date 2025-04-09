@@ -1,3 +1,4 @@
+import 'package:altura/models/fake_users.dart';
 import 'package:altura/services/altura_loader.dart';
 import 'package:altura/views/home/chat/chat_list_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -37,9 +38,8 @@ class _MainScreenState extends State<MainScreen> {
     // Inizializziamo la lista di pagine
     _pages = const [
       MapPage(),      // Pagina 0
-      RulesPage(),     // Pagina 1
-      PilotPage(),     // Pagina 2
-      ChatListPage(),  // Pagina 3
+      RulesPage(),    // Pagina 1
+      FakeUsersScreen(),  // Pagina 2 (es. Piloti o Chat, in base alla logica dell'app)
     ];
 
     // Carichiamo l'utente
@@ -53,7 +53,9 @@ class _MainScreenState extends State<MainScreen> {
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser == null) {
       debugPrint("[MainScreen] _initUser: Nessun utente loggato -> stop");
-      setState(() => _isLoadingUser = false);
+      if (mounted) {
+        setState(() => _isLoadingUser = false);
+      }
       return;
     }
 
@@ -62,23 +64,29 @@ class _MainScreenState extends State<MainScreen> {
         .doc(firebaseUser.uid)
         .get();
 
+    // Verifica che il widget sia ancora montato dopo l'await
+    if (!mounted) return;
+
     debugPrint("[MainScreen] _initUser: doc.exists = ${doc.exists}");
 
     if (!doc.exists || doc.data() == null) {
       debugPrint("[MainScreen] _initUser: Il documento utente non esiste o è vuoto");
-      setState(() {
-        _appUser = null;
-        _isLoadingUser = false;
-      });
+      if (mounted) {
+        setState(() {
+          _appUser = null;
+          _isLoadingUser = false;
+        });
+      }
     } else {
       final data = doc.data()!;
       final userModel = AppUser.fromMap(data);
-
       debugPrint("[MainScreen] _initUser: Caricato con successo -> ${userModel.uid} / ${userModel.username}");
-      setState(() {
-        _appUser = userModel;
-        _isLoadingUser = false;
-      });
+      if (mounted) {
+        setState(() {
+          _appUser = userModel;
+          _isLoadingUser = false;
+        });
+      }
     }
   }
 
@@ -111,7 +119,9 @@ class _MainScreenState extends State<MainScreen> {
     // Se l'utente non è trovato su Firestore, posticipiamo la navigazione
     if (_appUser == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacementNamed(context, '/login_page');
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/login_page');
+        }
       });
       // Restituiamo uno scaffold vuoto o un loader finché la navigazione non avviene
       return const Scaffold(
@@ -130,7 +140,6 @@ class _MainScreenState extends State<MainScreen> {
             index: _selectedIndex,
             children: _pages,
           ),
-
           // Pulsante in alto a sinistra per aprire il Drawer
           Positioned(
             top: 80.0,
@@ -159,8 +168,7 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ],
       ),
-
-      // BottomNavigationBar bianca, non a pillola
+      // BottomNavigationBar
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
@@ -226,7 +234,6 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
             ),
-
             // Voci di menu
             _buildDrawerTile(
               icon: Icons.account_circle_outlined,
@@ -261,10 +268,8 @@ class _MainScreenState extends State<MainScreen> {
                 Navigator.pushNamed(context, '/about_page');
               },
             ),
-
             // Spazio flessibile per spingere Logout in fondo
             const Spacer(),
-
             // Logout in fondo
             _buildDrawerTile(
               icon: Icons.logout,
@@ -306,7 +311,13 @@ class _MainScreenState extends State<MainScreen> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.5),
+      color: Theme.of(context).colorScheme.onPrimary,
     );
+  }
+
+  @override
+  void dispose() {
+    // Se in futuro verranno aggiunti timer o stream, assicurarsi di annullarli qui.
+    super.dispose();
   }
 }

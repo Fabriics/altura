@@ -104,11 +104,35 @@ class _RulesPageState extends State<RulesPage> {
 
   Widget _buildDisclaimer(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 24),
       child: Text(
         "Le informazioni riportate hanno solo valore indicativo e non costituiscono una fonte ufficiale. "
             "Per una corretta interpretazione e applicazione delle normative, si invita a fare sempre riferimento all'autorità aeronautica competente del paese di riferimento.",
         style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  Widget _buildLinkButton(String text, String? url) {
+    if (url == null || url.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+          foregroundColor: Theme.of(context).colorScheme.primary,
+          minimumSize: const Size.fromHeight(50),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onPressed: () async {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
+        icon: const Icon(Icons.link),
+        label: Text(text),
       ),
     );
   }
@@ -122,6 +146,10 @@ class _RulesPageState extends State<RulesPage> {
     final alt = data['maxAltitude']?.toString() ?? 'N/A';
     final description = data['description'] ?? "";
     final official = data['authorityLink'];
+    final whereToFly = data['whereToFly'];
+    final registerLink = data['registerAsDroneOperator'];
+    final pilotTraining = data['pilotTraining'];
+    final requestAuth = data['requestAuthorisation'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,23 +158,23 @@ class _RulesPageState extends State<RulesPage> {
           children: [
             if (flagUrl.isNotEmpty)
               ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(flagUrl, width: 40, height: 28, fit: BoxFit.cover),
+                borderRadius: BorderRadius.circular(6),
+                child: Image.network(flagUrl, width: 50, height: 34, fit: BoxFit.cover),
               ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Text(
               country,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+            color: Theme.of(context).colorScheme.surfaceVariant,
             borderRadius: BorderRadius.circular(12),
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -160,25 +188,19 @@ class _RulesPageState extends State<RulesPage> {
         const SizedBox(height: 24),
         Text(
           "Descrizione dettagliata",
-          style: Theme.of(context).textTheme.titleMedium,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
           description,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
         ),
         const SizedBox(height: 24),
-        if (official != null && official.isNotEmpty)
-          TextButton.icon(
-            onPressed: () async {
-              final uri = Uri.parse(official);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri);
-              }
-            },
-            icon: const Icon(Icons.open_in_new),
-            label: const Text("Vai al sito ufficiale dell'autorità"),
-          ),
+        _buildLinkButton("Sito ufficiale dell'autorità", official),
+        _buildLinkButton("Dove volare", whereToFly),
+        _buildLinkButton("Registrazione come operatore", registerLink),
+        _buildLinkButton("Formazione per piloti", pilotTraining),
+        _buildLinkButton("Richiedi autorizzazione al volo", requestAuth),
         _buildDisclaimer(context),
       ],
     );
@@ -211,12 +233,12 @@ class _RulesPageState extends State<RulesPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Normative mondiali (Premium)")),
+      appBar: AppBar(title: const Text("Normative di volo)")),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _allRules.length,
         itemBuilder: (context, index) => Padding(
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.only(bottom: 32),
           child: _buildRegulationCard(_allRules[index]),
         ),
       ),

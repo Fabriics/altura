@@ -1,9 +1,6 @@
-// user_model.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geoflutterfire_plus/geoflutterfire_plus.dart';
 
-/// Modello utente (AppUser) per la tua app Altura.
 class AppUser {
   final String uid;
   final String? email;
@@ -17,14 +14,21 @@ class AppUser {
   final DateTime createdAt;
   final DateTime lastLogin;
   final bool isEmailVerified;
-  final List<String> drones;
+  final bool? isCertified;
+  final bool? isAvailable;
+  final List<String> dronesList;
   final int? flightExperience;
+  final String? pilotLevel;           // Nuovo campo
   final String? instagram;
   final String? youtube;
   final String? website;
   final String? fcmToken;
   final double? latitude;
   final double? longitude;
+  final double? distanceKm;
+  final String? certificationUrl;
+  final String? certificationStatus;  // pending, approved, rejected
+  final String? certificationType;    // Nuovo campo
 
   AppUser({
     required this.uid,
@@ -39,17 +43,23 @@ class AppUser {
     required this.createdAt,
     required this.lastLogin,
     this.isEmailVerified = false,
-    this.drones = const [],
+    this.isCertified = false,
+    this.isAvailable = false,
+    this.dronesList = const [],
     this.flightExperience,
+    this.pilotLevel,
     this.instagram,
     this.youtube,
     this.website,
     this.fcmToken,
     this.latitude,
     this.longitude,
+    this.distanceKm,
+    this.certificationUrl,
+    this.certificationStatus,
+    this.certificationType,
   });
 
-  /// Converte l’istanza in una mappa (per salvare su Firestore).
   Map<String, dynamic> toMap() {
     Map<String, dynamic>? locationMap;
     if (latitude != null && longitude != null) {
@@ -69,22 +79,26 @@ class AppUser {
       'location': location,
       'favoritePlaces': favoritePlaces,
       'uploadedPlaces': uploadedPlaces,
-      // Drone activities
       'droneActivities': droneActivities,
       'createdAt': createdAt.toIso8601String(),
       'lastLogin': lastLogin.toIso8601String(),
       'isEmailVerified': isEmailVerified,
-      'drones': drones,
+      'isCertified': isCertified,
+      'isAvailable': isAvailable,
+      'drones': dronesList,
       'flightExperience': flightExperience,
+      'pilotLevel': pilotLevel,              // Incluso nella mappa
       'instagram': instagram,
       'youtube': youtube,
       'website': website,
       'fcmToken': fcmToken,
       'locationGeo': locationMap,
+      'certificationStatus': certificationStatus,
+      'certificationUrl': certificationUrl,
+      'certificationType': certificationType, // Incluso nella mappa
     };
   }
 
-  /// Crea un AppUser a partire da una mappa (ad es. i dati Firestore).
   factory AppUser.fromMap(Map<String, dynamic> map) {
     double? lat;
     double? lng;
@@ -111,14 +125,50 @@ class AppUser {
       createdAt: DateTime.parse(map['createdAt']),
       lastLogin: DateTime.parse(map['lastLogin']),
       isEmailVerified: map['isEmailVerified'] ?? false,
-      drones: List<String>.from(map['drones'] ?? []),
+      isCertified: map['isCertified'] ?? false,
+      isAvailable: map['isAvailable'] ?? false,
+      dronesList: List<String>.from(map['drones'] ?? []),
       flightExperience: map['flightExperience'],
+      pilotLevel: map['pilotLevel'],
       instagram: map['instagram'],
       youtube: map['youtube'],
       website: map['website'],
       fcmToken: map['fcmToken'],
       latitude: lat,
       longitude: lng,
+      certificationUrl: map['certificationUrl'],
+      certificationStatus: map['certificationStatus'],
+      certificationType: map['certificationType'],
+    );
+  }
+
+  AppUser copyWith({
+    double? distanceKm,
+  }) {
+    return AppUser(
+      uid: uid,
+      email: email,
+      username: username,
+      profileImageUrl: profileImageUrl,
+      bio: bio,
+      location: location,
+      favoritePlaces: favoritePlaces,
+      uploadedPlaces: uploadedPlaces,
+      droneActivities: droneActivities,
+      createdAt: createdAt,
+      lastLogin: lastLogin,
+      isEmailVerified: isEmailVerified,
+      isCertified: isCertified ?? this.isCertified,
+      isAvailable: isAvailable ?? this.isAvailable,
+      dronesList: dronesList,
+      flightExperience: flightExperience,
+      instagram: instagram,
+      youtube: youtube,
+      website: website,
+      fcmToken: fcmToken,
+      latitude: latitude,
+      longitude: longitude,
+      distanceKm: distanceKm ?? this.distanceKm,
     );
   }
 }

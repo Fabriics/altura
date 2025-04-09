@@ -1,23 +1,21 @@
 import 'dart:async';
-import 'package:altura/services/altura_loader.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:altura/services/altura_loader.dart';
 import '../../services/auth_service.dart';
 
 class VerifyEmailPage extends StatefulWidget {
-  const VerifyEmailPage({super.key});
+  const VerifyEmailPage({Key? key}) : super(key: key);
 
   @override
   State<VerifyEmailPage> createState() => _VerifyEmailPageState();
 }
 
 class _VerifyEmailPageState extends State<VerifyEmailPage> {
-  // Stato di caricamento per mostrare il loader durante le operazioni.
   bool isLoading = false;
   final Auth _authService = Auth();
 
-  // Variabili per il cooldown del pulsante "Rinvia Email"
   int _resendCooldown = 0;
   bool _canResend = true;
   Timer? _timer;
@@ -28,7 +26,6 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     super.dispose();
   }
 
-  /// Avvia un countdown di 60 secondi per il pulsante "Rinvia Email".
   void startCooldown() {
     setState(() {
       _resendCooldown = 60;
@@ -49,7 +46,6 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     });
   }
 
-  /// Mostra un toast con il messaggio passato.
   void showToast(String message) {
     Fluttertoast.showToast(
       msg: message,
@@ -61,44 +57,37 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     );
   }
 
-  /// Controlla se l'email è stata verificata.
-  /// Prima controlla che l'utente esista, per evitare errori "utente non trovato".
   Future<void> _checkEmailVerified() async {
     setState(() {
       isLoading = true;
     });
-
-    // Verifica che l'utente loggato esista
-    if (FirebaseAuth.instance.currentUser == null) {
-      showToast("Utente non trovato.");
-      setState(() {
-        isLoading = false;
-      });
-      return;
-    }
-
     try {
-      bool verified = await _authService.checkEmailVerified();
-      if (verified) {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        showToast("Utente non trovato.");
+        return;
+      }
+      // Ricarica i dati dell'utente per ottenere lo stato aggiornato della verifica
+      await user.reload();
+      user = FirebaseAuth.instance.currentUser;
+
+      if (user?.emailVerified ?? false) {
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/complete_profile_page');
       } else {
-        if (!mounted) return;
         showToast("La email non è ancora verificata.");
+      }
+    } catch (e) {
+      showToast("Errore durante la verifica: $e");
+    } finally {
+      if (mounted) {
         setState(() {
           isLoading = false;
         });
       }
-    } catch (e) {
-      if (!mounted) return;
-      showToast("Errore durante la verifica: $e");
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
-  /// Invia nuovamente l'email di verifica e avvia il cooldown.
   Future<void> _resendVerificationEmail() async {
     try {
       await _authService.resendVerificationEmail();
@@ -113,99 +102,151 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final userEmail = FirebaseAuth.instance.currentUser?.email ?? "la tua email";
     return Scaffold(
-      // AppBar: utilizza il colore primario del tema e titolo in bianco
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
+        centerTitle: true,
         title: Text(
           'Verifica e-mail',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(context)
+              .textTheme
+              .titleLarge
+              ?.copyWith(color: Colors.white),
         ),
-        centerTitle: true,
       ),
       body: SafeArea(
-        child: Center(
-          child: isLoading
-              ? const AlturaLoader()
-              : SingleChildScrollView(
+        child: isLoading
+            ? const AlturaLoader()
+            : SingleChildScrollView(
+          child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 8,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 32,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Icona per indicare l'azione di verifica
-                      Icon(
-                        Icons.mark_email_read_outlined,
-                        size: 80,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(height: 16),
-                      // Titolo del dialogo
-                      Text(
-                        "Verifica la tua email",
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                  elevation: 8,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header: titolo e descrizione
+                        Text(
+                          "Verifica la tua email",
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      // Istruzioni per l'utente
-                      Text(
-                        "Controlla la tua casella di posta e clicca sul link per verificare la tua email.",
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
-                      ),
-                      const SizedBox(height: 32),
-                      // Pulsante "Fatto": verifica se l'email è stata confermata
-                      ElevatedButton.icon(
-                        onPressed: _checkEmailVerified,
-                        icon: const Icon(Icons.check),
-                        label: const Text("Fatto"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Ti abbiamo inviato un link di verifica",
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        // Contenuto: icona e istruzioni
+                        Container(
+                          height: 64,
+                          width: 64,
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.mail_outline,
+                            size: 32,
+                            color: Colors.blue,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Pulsante per rinviare l'email di verifica
-                      ElevatedButton.icon(
-                        onPressed: _canResend ? _resendVerificationEmail : null,
-                        icon: const Icon(Icons.refresh),
-                        label: Text(_canResend
-                            ? "Rinvia Email di Verifica"
-                            : "Rinvia in $_resendCooldown s"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.secondary,
-                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
+                        const SizedBox(height: 16),
+                        Text(
+                          "Verifica la tua mail tramite il link inviato alla tua casella di posta.",
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(fontWeight: FontWeight.w500),
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          "Abbiamo inviato un'email a $userEmail",
+                          style: Theme.of(context).textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        // Footer: bottoni per "Fatto" e "Reinvia email"
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _checkEmailVerified,
+                                icon: const Icon(Icons.check),
+                                label: const Text("Fatto"),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 16), backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(16),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _canResend
+                                    ? _resendVerificationEmail
+                                    : null,
+                                icon: const Icon(Icons.refresh),
+                                label: Text(_canResend
+                                    ? "Reinvia email"
+                                    : "Reinvia in $_resendCooldown s"),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 16), backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .secondary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(16),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
+        ),
+      ),
+      // Footer simile alla FooterSection del componente React
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(
+          "FooterSection",
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall,
         ),
       ),
     );

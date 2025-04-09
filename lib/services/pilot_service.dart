@@ -1,83 +1,105 @@
-import 'dart:math' as math;
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geoflutterfire_plus/geoflutterfire_plus.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../models/user_model.dart';
-import '../../services/chat_service.dart';
+import 'package:geoflutterfire_plus/geoflutterfire_plus.dart';
+import '../models/user_model.dart';
 
-/// Il PilotService incapsula tutta la logica relativa al PilotPage:
-/// - Ottenimento della posizione utente (con gestione dei permessi)
-/// - Query geospaziali per ottenere i professionisti vicini
-/// - Calcolo della distanza (formula di Haversine)
-/// - Creazione/recupero della chat 1-to-1 con un professionista
 class PilotService {
-  /// Converte un angolo in gradi in radianti.
-  double _degToRad(double deg) => deg * (math.pi / 180);
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final _pilotStreamController = StreamController<List<AppUser>>.broadcast();
 
-  /// Calcola la distanza (in km) tra due coordinate lat/lng usando la formula di Haversine.
-  double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const R = 6371; // Raggio terrestre in km
-    final dLat = _degToRad(lat2 - lat1);
-    final dLon = _degToRad(lon2 - lon1);
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_degToRad(lat1)) * math.cos(_degToRad(lat2)) *
-            math.sin(dLon / 2) * math.sin(dLon / 2);
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return R * c;
+  // La posizione utente verrà impostata dopo averla recuperata
+  GeoFirePoint? _userLocation;
+  double _userLat = 0;
+  double _userLng = 0;
+  double _radius = 30;
+  bool _certifiedOnly = false;
+  bool _availableOnly = true;
+  List<String> _droneTypes = [];
+  bool _sortByDistance = false;
+
+  Stream<List<AppUser>> get pilotStream => _pilotStreamController.stream;
+
+  Future<void> fetchUserLocationAndPilots() async {
+    final pos = await Geolocator.getCurrentPosition();
+    // Creazione del GeoFirePoint in base alla posizione corrente
+    _userLocation = GeoFirePoint(GeoPoint(pos.latitude, pos.longitude));
+    _userLat = pos.latitude;
+    _userLng = pos.longitude;
+    _queryPilots();
   }
 
-  /// Ottiene la posizione corrente del dispositivo.
-  /// Verifica che il servizio di localizzazione sia abilitato e che i permessi siano concessi.
-  Future<Position> getUserPosition() async {
-    // Verifica se il servizio di localizzazione è attivo.
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw Exception("Servizio di localizzazione disabilitato sul dispositivo.");
-    }
-
-    // Verifica e richiede i permessi di localizzazione.
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception("Permesso di localizzazione negato dall'utente.");
-      }
-    }
-    if (permission == LocationPermission.deniedForever) {
-      throw Exception("Permesso di localizzazione negato permanentemente.");
-    }
-
-    // Ritorna la posizione corrente.
-    return Geolocator.getCurrentPosition();
+  void applyFilters({
+    required double radius,
+    required bool certifiedOnly,
+    required bool availableOnly,
+    required List<String> droneTypes,
+    bool sortByDistance = false,
+  }) {
+    _radius = radius;
+    _certifiedOnly = certifiedOnly;
+    _availableOnly = availableOnly;
+    _droneTypes = droneTypes;
+    _sortByDistance = sortByDistance;
+    _queryPilots();
   }
 
-  /// Esegue una query geospaziale su Firestore per ottenere i professionisti entro [radiusInKm] km dalla [position].
-  Future<List<AppUser>> getNearbyProfessionals(Position position, {double radiusInKm = 50}) async {
-    // Riferimento alla collezione "users" in Firestore.
-    final usersRef = FirebaseFirestore.instance.collection('users');
-    // Crea un GeoCollectionReference per eseguire query spaziali.
-    final geoCollection = GeoCollectionReference<Map<String, dynamic>>(usersRef);
-    // Crea un GeoFirePoint centrato sulla posizione corrente.
-    final centerPoint = GeoFirePoint(GeoPoint(position.latitude, position.longitude));
+  void _queryPilots() {
+    // Inizializza la reference alla collection "users" senza applicare filtri
+    CollectionReference usersCollection = _firestore.collection('users');
 
-    // Esegue la query spaziale.
-    final results = await geoCollection.fetchWithin(
-      center: centerPoint,
-      radiusInKm: radiusInKm,
-      field: 'location', // Il campo Firestore che contiene GeoPoint e geohash
-      geopointFrom: (data) => data['location']['geopoint'] as GeoPoint,
+    // Creazione della GeoCollectionReference utilizzando il CollectionReference
+    GeoCollectionReference geoRef = GeoCollectionReference(usersCollection);
+    geoRef.subscribeWithin(
+      center: _userLocation!,
+      radiusInKm: _radius,
+      field: 'locationGeo',
+      geopointFrom: (data) =>
+      (data['locationGeo'] as Map<String, dynamic>)['geopoint'] as GeoPoint,
       strictMode: true,
-    );
+      // Il parametro "limit" è stato rimosso perché non esiste in subscribeWithin
+    ).listen((snapshots) {
+      var filtered = snapshots
+          .map((doc) => AppUser.fromMap(doc.data() as Map<String, dynamic>))
+          .where((user) =>
+      user.uid.isNotEmpty &&
+          user.latitude != null &&
+          user.longitude != null)
+          .map((user) {
+        final double dist = Geolocator.distanceBetween(
+          _userLat,
+          _userLng,
+          user.latitude!,
+          user.longitude!,
+        ) / 1000; // conversione da metri a km
+        return user.copyWith(distanceKm: dist);
+      }).toList();
 
-    // Converte i risultati in una lista di AppUser.
-    return results.map((geoDoc) {
-      return AppUser.fromMap(geoDoc.data as Map<String, dynamic>);
-    }).toList();
+      // Ordinamento: se l'esperienza di volo è uguale, ordina per distanza;
+      // altrimenti ordina per flightExperience in ordine decrescente
+      if (_sortByDistance) {
+        filtered.sort((a, b) {
+          if ((a.flightExperience ?? 0) == (b.flightExperience ?? 0)) {
+            return (a.distanceKm ?? 9999).compareTo(b.distanceKm ?? 9999);
+          }
+          return (b.flightExperience ?? 0).compareTo(a.flightExperience ?? 0);
+        });
+      }
+
+      // Limita il numero di elementi a 50, se necessario
+      if (filtered.length > 50) {
+        filtered = filtered.take(50).toList();
+      }
+
+      _pilotStreamController.add(filtered);
+    });
   }
 
-  /// Crea o recupera la chat one-to-one con il professionista identificato da [professionalUid].
-  Future<String> createChat(String professionalUid) async {
-    final chatService = ChatService();
-    return chatService.createOrGetChat(professionalUid);
+  Future<void> setCurrentUserAvailable(String uid) async {
+    await _firestore.collection('users').doc(uid).update({
+      'isAvailable': true,
+    });
   }
+
+  void dispose() => _pilotStreamController.close();
 }

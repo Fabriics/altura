@@ -7,8 +7,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 
-/// Classe che centralizza tutta la logica di autenticazione e gestione del profilo utente.
-/// Include login, registrazione, invio/verifica email e gestione FCM.
 class Auth {
   final auth.FirebaseAuth _firebaseAuth = auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -27,24 +25,39 @@ class Auth {
   }
 
   /// Login con email e password.
-  /// Se l'utente non ha verificato la propria email, viene lanciata un'eccezione
-  /// con codice 'email-not-verified' (senza fare sign out, in modo da poter rinviare la mail).
   Future<void> signInWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
-    final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
-        email: email, password: password);
-    final user = _firebaseAuth.currentUser;
-    if (user != null) {
+    print('Inizio signInWithEmailAndPassword per email: $email');
+    try {
+      final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      print('Sign in completato. userCredential: $userCredential');
+
+      final user = _firebaseAuth.currentUser;
+      if (user == null) {
+        print('Errore: currentUser è null dopo il sign in.');
+        throw Exception('Utente non trovato');
+      }
+      print('Utente trovato: UID=${user.uid}, emailVerified=${user.emailVerified}');
+
       if (!user.emailVerified) {
+        print('Errore: Email non verificata per l’utente ${user.uid}');
         throw auth.FirebaseAuthException(
           code: 'email-not-verified',
-          message:
-          'La tua email non è ancora verificata. Verifica la tua casella e clicca sul link di verifica.',
+          message: 'La tua email non è ancora verificata. Verifica la tua casella e clicca sul link di verifica.',
         );
       }
+
       await _saveDeviceToken(user.uid);
+      print('Token FCM salvato con successo per l’utente ${user.uid}');
+    } catch (e, stacktrace) {
+      print('Errore durante signInWithEmailAndPassword: $e');
+      print('Stack trace: $stacktrace');
+      rethrow;
     }
   }
 
@@ -66,16 +79,12 @@ class Auth {
     final userCredential = await _firebaseAuth.signInWithCredential(credential);
     final user = userCredential.user;
     if (user != null) {
-      // Per Google di solito l'email è verificata
       await _saveDeviceToken(user.uid);
     }
     return userCredential;
   }
 
   /// Crea un nuovo utente con email, password e username.
-  /// Invia l'email di verifica e salva i dati su Firestore.
-  /// Imposta isEmailVerified a false e, per evitare accessi non verificati,
-  /// l'utente viene disconnesso (viene gestito a livello di login).
   Future<auth.UserCredential> createUserWithEmailAndPassword({
     required String email,
     required String password,
@@ -91,28 +100,42 @@ class Auth {
       final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
           email: email, password: password);
 
-      // Invia email di verifica
+      // Invia l'email di verifica
       await userCredential.user!.sendEmailVerification();
 
-      // Crea un AppUser con isEmailVerified = false
+      // Crea un AppUser con dati di default
       final newUser = AppUser(
         uid: userCredential.user!.uid,
         email: email,
         username: username,
         bio: bio,
         location: location,
-        drones: drones ?? [],
+        favoritePlaces: [],
+        uploadedPlaces: [],
+        droneActivities: [],
         createdAt: DateTime.now(),
         lastLogin: DateTime.now(),
         isEmailVerified: false,
+        isCertified: false,
+        isAvailable: false,
+        dronesList: drones ?? [],
+        flightExperience: 0,
+        pilotLevel: null,
+        instagram: null,
+        youtube: null,
+        website: null,
+        fcmToken: null,
+        latitude: null,
+        longitude: null,
+        distanceKm: null,
+        certificationUrl: null,
+        certificationStatus: null,
+        certificationType: null,
       );
 
-      // Salva su Firestore
+      // Salva l'utente su Firestore
       await _firestore.collection('users').doc(newUser.uid).set(newUser.toMap());
       await _saveDeviceToken(newUser.uid);
-
-      // Eseguiamo il sign out per far procedere l'utente al flusso di verifica
-      await _firebaseAuth.signOut();
 
       return userCredential;
     } catch (e) {
@@ -222,30 +245,32 @@ class Auth {
   }
 
   /// Completa il profilo aggiornando i campi su Firestore.
-  /// Include il campo 'droneActivities' per salvare le attività dell'utente.
   Future<void> completeProfile({
     required String username,
     required String bio,
     required String website,
     required String instagram,
     required String youtube,
-    required String flightExperience,
+    required int flightExperience,
     required List<String> drones,
-    required String location,
     required List<String> droneActivities,
+    required String location,
+    bool? isCertified,
+    String? certificationStatus,
+    String? certificationUrl,
+    String? pilotLevel,           // Nuovo parametro
+    String? certificationType,    // Nuovo parametro
   }) async {
     double? lat;
     double? lng;
     final trimmedLocation = location.trim();
 
-    // Forward geocoding se location non è vuota
     if (trimmedLocation.isNotEmpty) {
       try {
         final locations = await geo.locationFromAddress(trimmedLocation);
         if (locations.isNotEmpty) {
           lat = locations.first.latitude;
           lng = locations.first.longitude;
-          print('Geocoding riuscito: $trimmedLocation -> lat=$lat, lng=$lng');
         }
       } catch (e) {
         print('Impossibile fare geocoding per $trimmedLocation: $e');
@@ -258,12 +283,15 @@ class Auth {
       'website': website.trim(),
       'instagram': instagram.trim(),
       'youtube': youtube.trim(),
-      'flightExperience': int.tryParse(flightExperience.trim()) ?? 0,
+      'flightExperience': flightExperience, // Ora flightExperience è un int
       'drones': drones,
       'droneActivities': droneActivities,
       'location': trimmedLocation,
-      'latitude': lat,
-      'longitude': lng,
+      'pilotLevel': pilotLevel,              // Salvato su Firestore
+      'certificationType': certificationType, // Salvato su Firestore
+      'isCertified': isCertified,
+      'certificationStatus': certificationStatus,
+      'certificationUrl': certificationUrl,
     };
 
     final uid = currentUser?.uid;

@@ -26,13 +26,14 @@ dependencies:
   shared_preferences: ^2.5.2
   firebase_messaging: ^15.2.4
   firebase_in_app_messaging: ^0.8.1+4
-  geoflutterfire_plus: ^0.0.32
   geocoding: ^3.0.0
   geolocator: ^13.0.3
   google_sign_in: ^6.3.0
   fluttertoast: ^8.2.12
   flutter_launcher_icons: ^0.14.3
   url_launcher: ^6.3.1
+  geoflutterfire_plus: ^0.0.32
+  file_picker: ^10.0.0
 
 dev_dependencies:
   flutter_test:

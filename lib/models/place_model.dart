@@ -2,16 +2,6 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Modello che rappresenta un segnaposto nell'app.
-///
-/// - [id]: identificativo univoco del segnaposto (di solito il doc.id di Firestore).
-/// - [name]: titolo del segnaposto.
-/// - [latitude], [longitude]: coordinate geografiche della posizione.
-/// - [userId]: UID dell'utente che ha creato il segnaposto.
-/// - [category]: categoria o tipologia del segnaposto (es. "panoramico", "landing", ecc.).
-/// - [description]: testo descrittivo opzionale.
-/// - [createdAt]: data di creazione del segnaposto (null se non impostata).
-/// - [mediaUrls]: lista di URL di foto/video caricati su Firebase Storage.
-/// - [mediaFiles]: lista di file locali (non salvata su Firestore).
 class Place {
   /// Identificativo univoco del segnaposto.
   final String id;
@@ -43,6 +33,15 @@ class Place {
   /// Lista di file locali (foto/video) non salvati su Firestore.
   final List<File>? mediaFiles;
 
+  /// Conteggio dei "like" del segnaposto.
+  final int? likeCount;
+
+  /// Indica se è richiesta un’autorizzazione per volare in questo luogo.
+  final bool requiresPermission;
+
+  /// Dettagli dell’autorizzazione (se richiesta).
+  final String? permissionDetails;
+
   /// Costruttore principale di [Place].
   Place({
     required this.id,
@@ -55,18 +54,12 @@ class Place {
     this.createdAt,
     this.mediaUrls,
     this.mediaFiles,
+    this.likeCount,
+    this.requiresPermission = false,
+    this.permissionDetails,
   });
 
-  // ---------------------------------------------------------------------------
-  // FACTORY: fromMap
-  // ---------------------------------------------------------------------------
-  /// Crea un'istanza di [Place] a partire da una [Map] generica (es. un JSON).
-  /// Utilizzato, ad esempio, quando si hanno già i dati in forma di mappa
-  /// e si vuole costruire l'oggetto manualmente. Il campo [docId] indica l'ID
-  /// del documento (spesso doc.id di Firestore).
-  ///
-  /// Il campo [mediaFiles] viene impostato a null, perché di solito non è
-  /// persistito in Firestore.
+  /// Crea un'istanza di [Place] a partire da una [Map] (es. un JSON).
   factory Place.fromMap(String docId, Map<String, dynamic> data) {
     return Place(
       id: docId,
@@ -83,20 +76,15 @@ class Place {
           ? List<String>.from(data['mediaUrls'])
           : null,
       mediaFiles: null,
+      likeCount: data['likeCount'] != null ? (data['likeCount'] as num).toInt() : 0,
+      requiresPermission: data['requiresPermission'] ?? false,
+      permissionDetails: data['permissionDetails'] as String?,
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // FACTORY: fromFirestore
-  // ---------------------------------------------------------------------------
   /// Crea un'istanza di [Place] a partire da un [DocumentSnapshot] di Firestore.
-  /// Legge i campi dal [doc.data()] (che è una [Map]) e imposta [id] con doc.id.
-  ///
-  /// Se il campo [mediaUrls] non è presente, viene impostato a null.
-  /// Il campo [mediaFiles] non viene recuperato da Firestore (resta null).
   factory Place.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
-
     return Place(
       id: doc.id,
       name: data['name'] ?? '',
@@ -112,14 +100,13 @@ class Place {
           ? List<String>.from(data['mediaUrls'])
           : null,
       mediaFiles: null,
+      likeCount: data['likeCount'] != null ? (data['likeCount'] as num).toInt() : 0,
+      requiresPermission: data['requiresPermission'] ?? false,
+      permissionDetails: data['permissionDetails'] as String?,
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // toMap
-  // ---------------------------------------------------------------------------
   /// Converte l'istanza di [Place] in una [Map] da salvare su Firestore.
-  /// Non include [mediaFiles], che è un campo locale.
   Map<String, dynamic> toMap() {
     return {
       'name': name,
@@ -130,20 +117,20 @@ class Place {
       'description': description,
       'createdAt': createdAt,
       'mediaUrls': mediaUrls,
+      'likeCount': likeCount, // Includi il campo nel mapping
+      'requiresPermission': requiresPermission,
+      'permissionDetails': permissionDetails,
     };
   }
 
-  // ---------------------------------------------------------------------------
-  // copyWith
-  // ---------------------------------------------------------------------------
   /// Restituisce una copia di [Place] con alcuni campi modificati.
-  /// Se un campo non è specificato, mantiene il valore corrente.
   Place copyWith({
     String? name,
     String? description,
     String? category,
     List<String>? mediaUrls,
     List<File>? mediaFiles,
+    int? likeCount,
   }) {
     return Place(
       id: id,
@@ -156,17 +143,10 @@ class Place {
       createdAt: createdAt,
       mediaUrls: mediaUrls ?? this.mediaUrls,
       mediaFiles: mediaFiles ?? this.mediaFiles,
-    );
-  }
+      likeCount: likeCount ?? this.likeCount,
+      requiresPermission: requiresPermission,
+      permissionDetails: permissionDetails,
 
-  // ---------------------------------------------------------------------------
-  // totalPhotos
-  // ---------------------------------------------------------------------------
-  /// Restituisce il numero totale di foto (locali + remote).
-  /// Utile se vuoi mostrare un contatore di media disponibili.
-  int get totalPhotos {
-    final localCount = 0;
-    final remoteCount = mediaUrls?.length ?? 0;
-    return localCount + remoteCount;
+    );
   }
 }

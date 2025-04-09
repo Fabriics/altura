@@ -1,13 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../../../models/user_model.dart';
-import '../../../services/altura_loader.dart';
+import 'package:altura/models/user_model.dart';
+import 'package:altura/services/altura_loader.dart';
 import 'favorites_page.dart';
 import 'updated_places_page.dart';
 
 /// Pagina del profilo utente.
-/// Utilizza uno stream per aggiornare in tempo reale i dati utente da Firestore e
-/// mostra informazioni come avatar, nome, località e statistiche (Segnaposti, Salvati).
 class ProfilePage extends StatelessWidget {
   final AppUser user;
   const ProfilePage({super.key, required this.user});
@@ -17,12 +15,10 @@ class ProfilePage extends StatelessWidget {
     final uid = user.uid;
 
     return Scaffold(
-      // L'AppBar utilizza il tema globale, che prevede background blu profondo e icone bianche.
       appBar: AppBar(
         title: const Text('Profilo'),
         centerTitle: true,
         actions: [
-          // IconButton per modificare il profilo; l'icona non è hard-coded, usa lo stile del tema.
           IconButton(
             icon: Icon(
               Icons.edit,
@@ -34,7 +30,6 @@ class ProfilePage extends StatelessWidget {
           ),
         ],
       ),
-      // Utilizza uno StreamBuilder per aggiornare in tempo reale i dati dell'utente.
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
         builder: (context, snapshot) {
@@ -51,63 +46,78 @@ class ProfilePage extends StatelessWidget {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           final updatedUser = AppUser.fromMap(data);
 
-          // Costruisce il corpo del profilo utilizzando i dati aggiornati.
           return _buildProfileBody(context, updatedUser);
         },
       ),
     );
   }
 
-  /// Metodo che costruisce il corpo del profilo utente.
-  /// Mostra avatar, nome, località, statistiche e una TabBar per ulteriori sezioni.
+  /// Costruisce il corpo del profilo utente.
   Widget _buildProfileBody(BuildContext context, AppUser user) {
     final theme = Theme.of(context);
-
-    // Avatar: se è presente una URL, la usa; altrimenti utilizza un'immagine di placeholder.
     final profileImageUrl = user.profileImageUrl;
     final avatar = (profileImageUrl != null && profileImageUrl.isNotEmpty)
         ? NetworkImage(profileImageUrl)
         : const AssetImage('assets/placeholder.png') as ImageProvider;
 
-    // Contatori per segnaposti e posti salvati.
     final segnapostiCount = user.uploadedPlaces.length;
     final salvatiCount = user.favoritePlaces.length;
 
     return DefaultTabController(
-      length: 2, // Modifica questo valore se aggiungi ulteriori tab (es. "Servizi")
+      length: 2,
       child: SingleChildScrollView(
         child: Column(
           children: [
             const SizedBox(height: 16),
-            // Avatar utente con un CircleAvatar.
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.grey[300],
-              backgroundImage: avatar,
+            // Avatar in un contenitore con sfondo chiaro e bordi arrotondati.
+            Container(
+              padding: const EdgeInsets.all(8),
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.grey[300],
+                backgroundImage: avatar,
+              ),
             ),
             const SizedBox(height: 12),
-            // Nome utente, se disponibile.
             if (user.username.isNotEmpty)
               Text(
                 user.username,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  // Impostazione colore: usa il tema per mantenere coerenza (eventualmente theme.colorScheme.onSurface o simile)
                   color: theme.colorScheme.onSurface,
                 ),
               ),
-            // Visualizza la località, se presente.
-            if (user.location != null && user.location!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                user.location!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
-                ),
+            // Chips per Località, Livello e Ore di volo
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (user.location != null && user.location!.isNotEmpty)
+                    Chip(
+                      avatar: const Icon(Icons.location_on, size: 16),
+                      label: Text(user.location!),
+                    ),
+                  if (user.pilotLevel != null)
+                    Chip(
+                      avatar: const Icon(Icons.airplanemode_active, size: 16),
+                      label: Text('Livello: ${user.pilotLevel}'),
+                    ),
+                  if (user.flightExperience != null)
+                    Chip(
+                      avatar: const Icon(Icons.timer, size: 16),
+                      label: Text('Ore di volo: ${user.flightExperience}'),
+                    ),
+                ],
               ),
-            ],
+            ),
             const SizedBox(height: 16),
-            // Row con i contatori: "Segnaposti" e "Salvati".
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -140,28 +150,24 @@ class ProfilePage extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            // TabBar per sezioni aggiuntive, con uno sfondo che utilizza il fillColor dell'inputDecorationTheme.
+            // TabBar modernizzata con sfondo neutro.
             Container(
-              color: Theme.of(context).inputDecorationTheme.fillColor,
+              color: Colors.grey[200],
               child: TabBar(
-                labelColor: Theme.of(context).colorScheme.primary,
-                unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                indicatorColor: Theme.of(context).colorScheme.primary,
+                labelColor: theme.colorScheme.primary,
+                unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.6),
+                indicatorColor: theme.colorScheme.primary,
                 tabs: const [
                   Tab(text: "Su di me"),
                   Tab(text: "Informazioni"),
-                  // Aggiungi ulteriori tab se necessario, ad esempio: Tab(text: "Servizi"),
                 ],
               ),
             ),
-            // Visualizza il contenuto della tab selezionata in una TabBarView.
             SizedBox(
-              height: 500, // Altezza fissa; puoi renderla dinamica se necessario.
+              height: 500,
               child: TabBarView(
                 children: [
-                  // Sezione "Su di me"
                   _AboutMeSection(user: user),
-                  // Sezione "Informazioni"
                   _InfoSection(user: user),
                 ],
               ),
@@ -172,7 +178,6 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  /// Costruisce un widget per visualizzare un contatore (statistica) con etichetta.
   Widget _buildStatItem(BuildContext context, String label, String value) {
     final theme = Theme.of(context);
     return Column(
@@ -195,8 +200,7 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
-/// Sezione "Su di me" che mostra la biografia e una mappa statica della località.
-/// Include anche un'opzione per espandere il testo se troppo lungo.
+/// Sezione "Su di me" con biografia e mappa.
 class _AboutMeSection extends StatefulWidget {
   final AppUser user;
   const _AboutMeSection({required this.user});
@@ -207,62 +211,65 @@ class _AboutMeSection extends StatefulWidget {
 
 class _AboutMeSectionState extends State<_AboutMeSection> {
   bool _isExpanded = false;
-  // Inserisci la tua Google Maps Static API Key
+  // Inserisci qui la tua Google Maps Static API Key
   static const String _googleMapsApiKey = "LA_TUA_API_KEY";
 
   @override
   Widget build(BuildContext context) {
     final bio = widget.user.bio ?? "Nessuna descrizione";
-    // Se il testo è espanso, non limitare il numero di righe
     final maxLines = _isExpanded ? null : 5;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Testo della biografia con possibilità di espansione
-        Text(
-          bio,
-          maxLines: maxLines,
-          overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 8),
-        // Se il testo necessita di espansione, mostra il link "Leggi tutto"
-        if (!_isExpanded && _needsExpansion(bio))
-          InkWell(
-            onTap: () => setState(() => _isExpanded = true),
-            child: Text(
-              "Leggi tutto",
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
+        // Card moderna per la biografia.
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  bio,
+                  maxLines: maxLines,
+                  overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (!_isExpanded && _needsExpansion(bio))
+                  InkWell(
+                    onTap: () => setState(() => _isExpanded = true),
+                    child: Text(
+                      "Leggi tutto",
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-        const SizedBox(height: 24),
-        // Se l'utente ha latitudine e longitudine, mostra la sezione della mappa.
+        ),
+        const SizedBox(height: 16),
+        // Visualizzazione della mappa se latitudine e longitudine sono disponibili.
         if (_hasLatLong(widget.user)) ...[
           Text(
             "Località",
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 4),
-          // Mostra la località come stringa, con stile allineato al tema.
-          if (widget.user.location != null && widget.user.location!.isNotEmpty)
-            Text(
-              widget.user.location!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
-            ),
           const SizedBox(height: 8),
-          // Costruisce e visualizza una mappa statica tramite NetworkImage.
-          _buildStaticMap(widget.user.latitude!, widget.user.longitude!),
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            clipBehavior: Clip.antiAlias,
+            child: _buildStaticMap(widget.user.latitude!, widget.user.longitude!),
+          ),
         ],
       ],
     );
   }
 
-  /// Costruisce l'URL per una mappa statica e la visualizza in un'immagine.
   Widget _buildStaticMap(double lat, double lng) {
     final staticMapUrl =
         "https://maps.googleapis.com/maps/api/staticmap?"
@@ -272,29 +279,18 @@ class _AboutMeSectionState extends State<_AboutMeSection> {
         "&markers=color:red%7C$lat,$lng"
         "&key=$_googleMapsApiKey";
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        staticMapUrl,
-        fit: BoxFit.cover,
-        height: 180,
-      ),
+    return Image.network(
+      staticMapUrl,
+      fit: BoxFit.cover,
+      height: 180,
     );
   }
 
-  /// Determina se il testo richiede espansione in base alla sua lunghezza.
-  bool _needsExpansion(String text) {
-    return text.length > 200;
-  }
-
-  /// Verifica se l'utente ha latitudine e longitudine.
-  bool _hasLatLong(AppUser user) {
-    return (user.latitude != null && user.longitude != null);
-  }
+  bool _needsExpansion(String text) => text.length > 200;
+  bool _hasLatLong(AppUser user) => (user.latitude != null && user.longitude != null);
 }
 
-/// Sezione "Informazioni" che mostra dati come droni e social.
-/// I dati social vengono visualizzati con chip e righe in base ai valori presenti.
+/// Sezione "Informazioni" con droni, social e certificazione.
 class _InfoSection extends StatelessWidget {
   final AppUser user;
   const _InfoSection({required this.user});
@@ -306,68 +302,90 @@ class _InfoSection extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Se l'utente ha droni, li mostra in un Wrap con Chip
-        if (user.drones.isNotEmpty) ...[
-          Text("I miei droni", style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: user.drones.map((drone) {
-              return Chip(
-                label: Text(drone),
-                backgroundColor: theme.colorScheme.primary,
-                labelStyle: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onPrimary,
-                ),
-              );
-            }).toList(),
+        // Card per i droni con lista in stile moderno e logo della marca.
+        if (user.dronesList.isNotEmpty) ...[
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("I miei droni", style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: user.dronesList.map((drone) {
+                      return Chip(
+                        avatar: CircleAvatar(
+                          backgroundImage: AssetImage('assets/logos/${drone.toLowerCase()}.png'),
+                        ),
+                        label: Text(drone),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 24),
         ],
-        // Se sono presenti dati social, li mostra in una lista.
+        // Card per i social
         if (_hasAnySocial(user)) ...[
-          Text("Social", style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          if (user.instagram != null && user.instagram!.isNotEmpty)
-            _buildSocialRow(
-              context,
-              icon: Icons.camera_alt_outlined,
-              label: "Instagram",
-              value: user.instagram!,
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Social", style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  if (user.instagram != null && user.instagram!.isNotEmpty)
+                    _buildSocialRow(
+                      context,
+                      icon: Icons.camera_alt_outlined,
+                      label: "Instagram",
+                      value: user.instagram!,
+                    ),
+                  if (user.youtube != null && user.youtube!.isNotEmpty)
+                    _buildSocialRow(
+                      context,
+                      icon: Icons.video_collection_outlined,
+                      label: "YouTube",
+                      value: user.youtube!,
+                    ),
+                  if (user.website != null && user.website!.isNotEmpty)
+                    _buildSocialRow(
+                      context,
+                      icon: Icons.link,
+                      label: "Website",
+                      value: user.website!,
+                    ),
+                ],
+              ),
             ),
-          if (user.youtube != null && user.youtube!.isNotEmpty)
-            _buildSocialRow(
-              context,
-              icon: Icons.video_collection_outlined,
-              label: "YouTube",
-              value: user.youtube!,
-            ),
-          if (user.website != null && user.website!.isNotEmpty)
-            _buildSocialRow(
-              context,
-              icon: Icons.link,
-              label: "Website",
-              value: user.website!,
-            ),
+          ),
+          const SizedBox(height: 24),
         ],
+        // Card per la certificazione.
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: _buildCertificationInfo(context),
+          ),
+        ),
       ],
     );
   }
 
-  /// Determina se l'utente ha almeno un social link.
-  bool _hasAnySocial(AppUser user) {
-    return (user.instagram != null && user.instagram!.isNotEmpty) ||
-        (user.youtube != null && user.youtube!.isNotEmpty) ||
-        (user.website != null && user.website!.isNotEmpty);
-  }
-
-  /// Costruisce una riga per mostrare un'informazione social.
-  Widget _buildSocialRow(BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
+  Widget _buildSocialRow(BuildContext context,
+      {required IconData icon, required String label, required String value}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -382,5 +400,50 @@ class _InfoSection extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildCertificationInfo(BuildContext context) {
+    final theme = Theme.of(context);
+    String certText;
+    IconData certIcon;
+    Color iconColor;
+
+    if (user.certificationUrl != null && user.certificationUrl!.isNotEmpty) {
+      // Controlla lo stato della certificazione.
+      if (user.certificationStatus != null && user.certificationStatus == "approved") {
+        certText = "Certificazione verificata";
+        certIcon = Icons.check_circle;
+        iconColor = Colors.green;
+      } else if (user.certificationStatus != null && user.certificationStatus == "pending") {
+        certText = "Certificazione in corso di verifica";
+        certIcon = Icons.hourglass_bottom;
+        iconColor = Colors.orange;
+      } else {
+        certText = "Certificazione non presente";
+        certIcon = Icons.cancel;
+        iconColor = Colors.red;
+      }
+    } else {
+      certText = "Certificazione non presente";
+      certIcon = Icons.cancel;
+      iconColor = Colors.red;
+    }
+
+    return Row(
+      children: [
+        Icon(certIcon, color: iconColor),
+        const SizedBox(width: 8),
+        Text(
+          certText,
+          style: theme.textTheme.bodyMedium?.copyWith(fontSize: 16),
+        ),
+      ],
+    );
+  }
+
+  bool _hasAnySocial(AppUser user) {
+    return (user.instagram != null && user.instagram!.isNotEmpty) ||
+        (user.youtube != null && user.youtube!.isNotEmpty) ||
+        (user.website != null && user.website!.isNotEmpty);
   }
 }

@@ -9,7 +9,6 @@ final ThemeData appTheme = ThemeData(
   ).copyWith(
     primary: const Color(0xFF0A2342),        // Blu profondo
     onPrimary: Colors.white,
-    secondary: const Color(0xFF4FA3F7),      // Azzurro Altura
     onSecondary: Colors.white,
     surface: const Color(0xFFD9E4F5),        // Grigio chiaro superfici
     onSurface: const Color(0xFF1C1F2A),      // Testo scuro su sfondo chiaro
@@ -33,6 +32,7 @@ final ThemeData appTheme = ThemeData(
     buttonColor: const Color(0xFF0A2342),
     textTheme: ButtonTextTheme.primary,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+
   ),
 
   elevatedButtonTheme: ElevatedButtonThemeData(
@@ -46,7 +46,7 @@ final ThemeData appTheme = ThemeData(
 
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
-    fillColor: const Color(0xFFD9E4F5),
+    fillColor:  Colors.grey[350],
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(15),
       borderSide: BorderSide.none,

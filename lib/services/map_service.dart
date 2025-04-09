@@ -1,19 +1,16 @@
-
 import 'dart:async';
-
 
 import 'package:altura/services/place_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_open_app_settings/flutter_open_app_settings.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../models/place_model.dart';
-import 'auth_service.dart';
 import '../views/home/edit/edit_place_page.dart';
 import '../views/home/search_page.dart';
 
@@ -25,29 +22,32 @@ class MapService extends ChangeNotifier {
   bool isLoading = true;
   final LatLng defaultPosition = const LatLng(48.488, 13.678);
   GoogleMapController? mapController;
-
   final PlacesController placesController;
+  GeoPoint? _previousGeoPoint;
 
   MapService({required this.placesController});
 
   Future<void> initLocation({BuildContext? context}) async {
     try {
       if (!await _location.serviceEnabled() && !await _location.requestService()) {
-        return handleLocationPermissionDenied(context: context);
+        return _handleLocationPermissionDenied(context: context);
       }
-      PermissionStatus permission = await _location.hasPermission();
+      final permission = await _location.hasPermission();
       if (permission == PermissionStatus.deniedForever ||
-          (permission == PermissionStatus.denied &&
-              await _location.requestPermission() != PermissionStatus.granted)) {
-        return handleLocationPermissionDenied(context: context);
+          (permission == PermissionStatus.denied && await _location.requestPermission() != PermissionStatus.granted)) {
+        return _handleLocationPermissionDenied(context: context);
       }
       _locationSubscription?.cancel();
       _locationSubscription = _location.onLocationChanged.listen((locData) {
         currentLocation = locData;
         notifyListeners();
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) updateUserLocationInFirestore(user.uid);
       });
       currentLocation = await _location.getLocation();
       hasLocationPermission = true;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) updateUserLocationInFirestore(user.uid);
     } catch (e) {
       debugPrint('Errore localizzazione: $e');
     } finally {
@@ -57,7 +57,30 @@ class MapService extends ChangeNotifier {
     }
   }
 
-  void handleLocationPermissionDenied({BuildContext? context}) {
+  Future<void> updateUserLocationInFirestore(String uid) async {
+    if (currentLocation?.latitude == null || currentLocation?.longitude == null) return;
+    final geoPoint = GeoPoint(currentLocation!.latitude!, currentLocation!.longitude!);
+    if (_previousGeoPoint != null) {
+      final distance = Geolocator.distanceBetween(
+        _previousGeoPoint!.latitude,
+        _previousGeoPoint!.longitude,
+        geoPoint.latitude,
+        geoPoint.longitude,
+      );
+      if (distance < 10) return;
+    }
+    _previousGeoPoint = geoPoint;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'locationGeo': {'geopoint': geoPoint},
+      });
+      debugPrint('Firestore aggiornato con GeoPoint: (${geoPoint.latitude}, ${geoPoint.longitude})');
+    } catch (e) {
+      debugPrint('Errore aggiornamento Firestore: $e');
+    }
+  }
+
+  void _handleLocationPermissionDenied({BuildContext? context}) {
     hasLocationPermission = false;
     isLoading = false;
     notifyListeners();
@@ -70,10 +93,14 @@ class MapService extends ChangeNotifier {
   }
 
   void moveCameraToCurrentLocation() {
-    if (hasLocationPermission && currentLocation != null) {
-      mapController?.animateCamera(CameraUpdate.newLatLng(
-        LatLng(currentLocation!.latitude!, currentLocation!.longitude!),
-      ));
+    if (hasLocationPermission &&
+        currentLocation?.latitude != null &&
+        currentLocation?.longitude != null) {
+      mapController?.animateCamera(
+        CameraUpdate.newLatLng(
+          LatLng(currentLocation!.latitude!, currentLocation!.longitude!),
+        ),
+      );
     }
   }
 
@@ -114,10 +141,8 @@ class MapService extends ChangeNotifier {
       showLocationSettingsDialog(context);
       return null;
     }
-
     final info = await showAddPlaceWizard();
     if (info == null) return null;
-
     final newPlace = await placesController.addPlace(
       latitude: latLng.latitude,
       longitude: latLng.longitude,
@@ -127,17 +152,15 @@ class MapService extends ChangeNotifier {
       description: info['description'],
       mediaFiles: info['media'],
     );
-
-    await _updateUserPlaces(user.uid, newPlace.id);
+    await updateUserPlaces(user.uid, newPlace.id);
     await initUser();
     mapController?.animateCamera(CameraUpdate.newLatLng(
       LatLng(newPlace.latitude, newPlace.longitude),
     ));
-
     return newPlace;
   }
 
-  Future<void> _updateUserPlaces(String uid, String placeId) async {
+  Future<void> updateUserPlaces(String uid, String placeId) async {
     try {
       await FirebaseFirestore.instance.collection('users').doc(uid).update({
         'uploadedPlaces': FieldValue.arrayUnion([placeId]),
@@ -195,23 +218,19 @@ class MapService extends ChangeNotifier {
       MaterialPageRoute(builder: (_) => const SearchPage()),
     );
     if (result == null) return;
-    final latLng = LatLng(result['lat'], result['lng']);
-    mapController?.animateCamera(CameraUpdate.newLatLng(latLng));
-    placesController.markers.clear();
-    placesController.markers.add(
-      Marker(
-        markerId: const MarkerId('searchedLocation'),
-        position: latLng,
-        infoWindow: const InfoWindow(title: 'Risultato ricerca'),
-        flat: true,
-      ),
-    );
-    onSearchResult(latLng);
-  }
-
-  Future<void> signOut({required BuildContext context}) async {
-    await Auth().signOut();
-    Navigator.pushReplacementNamed(context, '/login_page');
+    final searchLatLng = LatLng(result['lat'], result['lng']);
+    mapController?.animateCamera(CameraUpdate.newLatLng(searchLatLng));
+    placesController.markers
+      ..clear()
+      ..add(
+        Marker(
+          markerId: const MarkerId('searchedLocation'),
+          position: searchLatLng,
+          infoWindow: const InfoWindow(title: 'Risultato ricerca'),
+          flat: true,
+        ),
+      );
+    onSearchResult(searchLatLng);
   }
 
   @override

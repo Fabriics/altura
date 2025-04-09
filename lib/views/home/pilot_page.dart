@@ -1,153 +1,175 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import '../../models/user_model.dart';
-import '../../services/altura_loader.dart';
 import '../../services/pilot_service.dart';
-import 'chat/chat_page.dart';
 
-
-/// PilotPage si occupa di mostrare l'interfaccia utente:
-/// - Ottiene la posizione corrente e, a partire da essa,
-///   esegue una query per i professionisti vicini.
-/// - Mostra la lista dei professionisti con informazioni come distanza, bio e immagine.
-/// - Permette di contattare il professionista aprendo una chat 1-to-1.
-class PilotPage extends StatelessWidget {
+class PilotPage extends StatefulWidget {
   const PilotPage({super.key});
 
   @override
+  State<PilotPage> createState() => _PilotPageState();
+}
+
+class _PilotPageState extends State<PilotPage> {
+  final PilotService _service = PilotService();
+  bool _showFilters = false;
+  double _sliderValue = 30;
+  bool _sortByDistance = false;
+  bool _certifiedOnly = false;
+  // Impostato a true per mostrare solo i piloti disponibili
+  final bool _availableOnly = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _service.fetchUserLocationAndPilots();
+  }
+
+  void _applyFilters() {
+    _service.applyFilters(
+      radius: _sliderValue,
+      certifiedOnly: _certifiedOnly,
+      availableOnly: _availableOnly,
+      droneTypes: [],
+      sortByDistance: _sortByDistance,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Istanza del service che incapsula la logica.
-    final PilotService pilotService = PilotService();
-
-    return FutureBuilder<Position>(
-      future: pilotService.getUserPosition(),
-      builder: (context, snapshot) {
-        // Mostra un loader mentre si ottiene la posizione.
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            appBar: AppBar(
-                automaticallyImplyLeading: false,
-                title: const Text("Piloti")
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Piloti'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // Sostituisci "USER_ID" con l'ID reale dell'utente corrente
+              await _service.setCurrentUserAvailable("USER_ID");
+            },
+            child: const Text(
+              'Diventa disponibile',
+              style: TextStyle(color: Colors.white),
             ),
-            body: const Center(child: AlturaLoader()),
-          );
-        }
-        // Gestione degli errori nel recupero della posizione.
-        if (snapshot.hasError) {
-          return Scaffold(
-            appBar: AppBar(
-                automaticallyImplyLeading: false,
-                title: const Text("Piloti")
-            ),
-            body: Center(child: Text('Errore nel recupero della posizione:\n${snapshot.error}')),
-          );
-        }
-        if (!snapshot.hasData) {
-          return Scaffold(
-            appBar: AppBar(
-                automaticallyImplyLeading: false,
-                title: const Text("Piloti")
-            ),
-            body: const Center(child: Text('Impossibile ottenere la posizione.')),
-          );
-        }
-
-        // Una volta ottenuta la posizione, esegue la query dei professionisti.
-        final userPosition = snapshot.data!;
-        return FutureBuilder<List<AppUser>>(
-          future: pilotService.getNearbyProfessionals(userPosition),
-          builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: AlturaLoader()),
-              );
-            }
-            if (snap.hasError) {
-              return Scaffold(
-                appBar: AppBar(
-                    automaticallyImplyLeading: false,
-                    title: const Text("Piloti")
-                ),
-                body: Center(child: Text('Errore nel recupero dei professionisti:\n${snap.error}')),
-              );
-            }
-            if (!snap.hasData || snap.data!.isEmpty) {
-              return Scaffold(
-                appBar: AppBar(
-                    automaticallyImplyLeading: false,
-                    title: const Text("Piloti")
-                ),
-                body: const Center(child: Text('Nessun professionista trovato nel raggio di 50 km.')),
-              );
-            }
-
-            // Mostra la lista dei professionisti.
-            final professionals = snap.data!;
-            return Scaffold(
-              appBar: AppBar(
-                  automaticallyImplyLeading: false,
-                  title: const Text("Piloti")
+          ),
+          IconButton(
+            icon: Icon(_showFilters ? Icons.close : Icons.filter_alt_outlined),
+            onPressed: () => setState(() {
+              _showFilters = !_showFilters;
+            }),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (_showFilters)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Filtra per raggio"),
+                  Slider(
+                    min: 5,
+                    max: 100,
+                    divisions: 19,
+                    label: "${_sliderValue.toInt()} km",
+                    value: _sliderValue,
+                    onChanged: (value) {
+                      setState(() => _sliderValue = value);
+                    },
+                    onChangeEnd: (_) => _applyFilters(),
+                  ),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _certifiedOnly,
+                        onChanged: (value) {
+                          setState(() => _certifiedOnly = value ?? false);
+                          _applyFilters();
+                        },
+                      ),
+                      const Text("Solo piloti certificati"),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _sortByDistance,
+                        onChanged: (value) {
+                          setState(() => _sortByDistance = value ?? false);
+                          _applyFilters();
+                        },
+                      ),
+                      const Text("Ordina per distanza / esperienza"),
+                    ],
+                  ),
+                ],
               ),
-              body: ListView.builder(
-                itemCount: professionals.length,
-                itemBuilder: (context, index) {
-                  final pro = professionals[index];
-                  // Calcola la distanza tra l'utente e il professionista.
-                  final lat = pro.latitude ?? 0.0;
-                  final lng = pro.longitude ?? 0.0;
-                  final distanceKm = pilotService.calculateDistance(
-                    userPosition.latitude,
-                    userPosition.longitude,
-                    lat,
-                    lng,
-                  );
-
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    child: ListTile(
+            ),
+          Expanded(
+            child: StreamBuilder<List<AppUser>>(
+              stream: _service.pilotStream,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                final pilots = snapshot.data!;
+                return ListView.builder(
+                  itemCount: pilots.length,
+                  itemBuilder: (context, index) {
+                    final pilot = pilots[index];
+                    return ListTile(
                       leading: CircleAvatar(
-                        radius: 24,
-                        backgroundImage: (pro.profileImageUrl != null && pro.profileImageUrl!.isNotEmpty)
-                            ? NetworkImage(pro.profileImageUrl!)
-                            : const AssetImage('assets/placeholder.png') as ImageProvider,
+                        backgroundImage: (pilot.profileImageUrl != null &&
+                            pilot.profileImageUrl!.isNotEmpty)
+                            ? NetworkImage(pilot.profileImageUrl!)
+                            : null,
+                        child: (pilot.profileImageUrl == null ||
+                            pilot.profileImageUrl!.isEmpty)
+                            ? const Icon(Icons.person)
+                            : null,
                       ),
-                      title: Text(
-                        pro.username,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      title: Text(pilot.username),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Distanza: ${distanceKm.toStringAsFixed(1)} km"),
-                          if (pro.bio != null && pro.bio!.isNotEmpty)
-                            Text(
-                              pro.bio!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          Wrap(
+                            spacing: 6,
+                            children: pilot.dronesList
+                                .map((d) => Chip(label: Text(d)))
+                                .toList(),
+                          ),
+                          if (pilot.bio != null) Text(pilot.bio!),
+                          if (pilot.distanceKm != null)
+                            Text("Distanza: ${pilot.distanceKm!.toStringAsFixed(1)} km"),
+                          Text("Esperienza: ${pilot.flightExperience ?? 0} anni"),
+                          Text(
+                            pilot.isCertified == true ? "Certificato" : "Non certificato",
+                            style: TextStyle(
+                                color: pilot.isCertified == true ? Colors.green : Colors.red),
+                          ),
+                          Text(
+                            pilot.isAvailable == true ? "Disponibile" : "Non disponibile",
+                            style: TextStyle(
+                                color: pilot.isAvailable == true ? Colors.green : Colors.red),
+                          ),
                         ],
                       ),
-                      trailing: ElevatedButton(
-                        onPressed: () async {
-                          // Crea o recupera la chat con il professionista e naviga alla ChatPage.
-                          final chatId = await pilotService.createChat(pro.uid);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatPage(chatId: chatId),
-                            ),
-                          );
-                        },
-                        child: const Text('Contatta'),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        );
-      },
+                      trailing: const Icon(Icons.message),
+                      onTap: () {
+                        // Logica per contattare il pilota
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  @override
+  void dispose() {
+    _service.dispose();
+    super.dispose();
   }
 }
