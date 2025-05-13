@@ -1,4 +1,5 @@
 import 'package:altura/views/auth/forgot_password_page.dart';
+import 'package:altura/views/home/expert_page.dart';
 import 'package:altura/views/home/settings/change_password_page.dart';
 import 'package:altura/views/home/settings/delete_account_page.dart';
 import 'package:altura/views/home/settings/notifications_settings_page.dart';
@@ -82,6 +83,7 @@ class MyApp extends StatelessWidget {
         '/edit_profile_page': (context) => EditProfilePage(),
         '/search_page': (context) => SearchPage(),
         '/notification_settings_page': (context) => NotificationSettingsPage(),
+        '/expert_page': (context) => ExpertPage(),
         '/main_screen': (context) => const MainScreen(),
       },
     );

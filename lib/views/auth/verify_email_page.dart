@@ -6,7 +6,7 @@ import 'package:altura/services/altura_loader.dart';
 import '../../services/auth_service.dart';
 
 class VerifyEmailPage extends StatefulWidget {
-  const VerifyEmailPage({Key? key}) : super(key: key);
+  const VerifyEmailPage({super.key});
 
   @override
   State<VerifyEmailPage> createState() => _VerifyEmailPageState();
@@ -106,15 +106,8 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        elevation: 0,
-        centerTitle: true,
         title: Text(
           'Verifica e-mail',
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(color: Colors.white),
         ),
       ),
       body: SafeArea(

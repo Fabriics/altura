@@ -1,6 +1,5 @@
 import Flutter
 import UIKit
-import GoogleMaps
 import GoogleSignIn
 
 @main
@@ -10,7 +9,7 @@ import GoogleSignIn
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
-    GMSServices.provideAPIKey("AIzaSyBB6JMMFw8Vz1MniyHuz4_iN3xQ7QbWbv8")
+    //GMSServices.provideAPIKey("AIzaSyBB6JMMFw8Vz1MniyHuz4_iN3xQ7QbWbv8")
     // Non è necessario impostare il presentingViewController qui
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

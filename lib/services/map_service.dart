@@ -1,15 +1,14 @@
 import 'dart:async';
-
 import 'package:altura/services/place_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_open_app_settings/flutter_open_app_settings.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as lt;
 import 'package:location/location.dart';
 import 'package:geolocator/geolocator.dart';
-
 import '../models/place_model.dart';
 import '../views/home/edit/edit_place_page.dart';
 import '../views/home/search_page.dart';
@@ -20,12 +19,15 @@ class MapService extends ChangeNotifier {
   LocationData? currentLocation;
   bool hasLocationPermission = false;
   bool isLoading = true;
-  final LatLng defaultPosition = const LatLng(48.488, 13.678);
-  GoogleMapController? mapController;
+  final lt.LatLng defaultPosition = const lt.LatLng(48.488, 13.678);
+  MapController? mapController;
   final PlacesController placesController;
   GeoPoint? _previousGeoPoint;
 
-  MapService({required this.placesController});
+  MapService({required this.placesController}) {
+    // Inizializza il MapController di FlutterMap
+    mapController = MapController();
+  }
 
   Future<void> initLocation({BuildContext? context}) async {
     try {
@@ -34,7 +36,8 @@ class MapService extends ChangeNotifier {
       }
       final permission = await _location.hasPermission();
       if (permission == PermissionStatus.deniedForever ||
-          (permission == PermissionStatus.denied && await _location.requestPermission() != PermissionStatus.granted)) {
+          (permission == PermissionStatus.denied &&
+              await _location.requestPermission() != PermissionStatus.granted)) {
         return _handleLocationPermissionDenied(context: context);
       }
       _locationSubscription?.cancel();
@@ -89,17 +92,17 @@ class MapService extends ChangeNotifier {
   }
 
   void setDefaultLocation() {
-    mapController?.animateCamera(CameraUpdate.newLatLng(defaultPosition));
+    mapController?.move(defaultPosition, 14.0);
   }
 
+  /// Sposta la camera sulla posizione corrente.
   void moveCameraToCurrentLocation() {
     if (hasLocationPermission &&
         currentLocation?.latitude != null &&
         currentLocation?.longitude != null) {
-      mapController?.animateCamera(
-        CameraUpdate.newLatLng(
-          LatLng(currentLocation!.latitude!, currentLocation!.longitude!),
-        ),
+      mapController?.move(
+        lt.LatLng(currentLocation!.latitude!, currentLocation!.longitude!),
+        14.0,
       );
     }
   }
@@ -131,7 +134,7 @@ class MapService extends ChangeNotifier {
   }
 
   Future<Place?> addMarkerAtPosition({
-    required LatLng latLng,
+    required lt.LatLng latLng,
     required BuildContext context,
     required Future<Map<String, dynamic>?> Function() showAddPlaceWizard,
     required Future<void> Function() initUser,
@@ -152,11 +155,12 @@ class MapService extends ChangeNotifier {
       description: info['description'],
       mediaFiles: info['media'],
     );
-    await updateUserPlaces(user.uid, newPlace.id);
+    await updateUserLocationInFirestore(user.uid);
     await initUser();
-    mapController?.animateCamera(CameraUpdate.newLatLng(
-      LatLng(newPlace.latitude, newPlace.longitude),
-    ));
+    mapController?.move(
+      lt.LatLng(newPlace.latitude, newPlace.longitude),
+      14.0,
+    );
     return newPlace;
   }
 
@@ -211,25 +215,15 @@ class MapService extends ChangeNotifier {
 
   Future<void> openSearchPage({
     required BuildContext context,
-    required void Function(LatLng latLng) onSearchResult,
+    required void Function(lt.LatLng latLng) onSearchResult,
   }) async {
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(builder: (_) => const SearchPage()),
     );
     if (result == null) return;
-    final searchLatLng = LatLng(result['lat'], result['lng']);
-    mapController?.animateCamera(CameraUpdate.newLatLng(searchLatLng));
-    placesController.markers
-      ..clear()
-      ..add(
-        Marker(
-          markerId: const MarkerId('searchedLocation'),
-          position: searchLatLng,
-          infoWindow: const InfoWindow(title: 'Risultato ricerca'),
-          flat: true,
-        ),
-      );
+    final searchLatLng = lt.LatLng(result['lat'], result['lng']);
+    mapController?.move(searchLatLng, 14.0);
     onSearchResult(searchLatLng);
   }
 

@@ -1,24 +1,43 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:altura/models/user_model.dart';
 import 'package:altura/services/altura_loader.dart';
+import '../chat/chat_page.dart';
 import 'favorites_page.dart';
 import 'updated_places_page.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:altura/services/chat_service.dart';
 
 /// Pagina del profilo utente.
+/// Il parametro [isOwner] era previsto per indicare se il profilo appartiene
+/// all'utente corrente, ma in questo esempio il controllo viene eseguito
+/// direttamente verificando il uid dell'utente con FirebaseAuth.
 class ProfilePage extends StatelessWidget {
   final AppUser user;
-  const ProfilePage({super.key, required this.user});
+  // Il parametro isOwner può essere mantenuto per altri scopi, ma il pulsante viene
+  // visualizzato in base al controllo sul FirebaseAuth.
+  final bool isOwner;
+
+  const ProfilePage({super.key, required this.user, this.isOwner = false});
 
   @override
   Widget build(BuildContext context) {
-    final uid = user.uid;
+    // Recupera l'utente corrente dal FirebaseAuth.
+    final currentUser = FirebaseAuth.instance.currentUser;
+    // Definisce isSelf come true se il profilo visualizzato appartiene all'utente corrente.
+    final bool isSelf = currentUser != null && currentUser.uid == user.uid;
 
     return Scaffold(
+      // AppBar con titolo centrato e, se l'utente sta visualizzando il proprio profilo,
+      // viene mostrata l'icona di modifica.
       appBar: AppBar(
         title: const Text('Profilo'),
         centerTitle: true,
-        actions: [
+        actions: isOwner
+            ? [
           IconButton(
             icon: Icon(
               Icons.edit,
@@ -28,10 +47,12 @@ class ProfilePage extends StatelessWidget {
               Navigator.pushNamed(context, '/edit_profile_page');
             },
           ),
-        ],
+        ]
+            : null,
       ),
+      // Il body si basa su uno StreamBuilder che ascolta le variazioni del documento utente in Firestore
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+        stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return const Center(child: Text('Errore di connessione.'));
@@ -49,80 +70,149 @@ class ProfilePage extends StatelessWidget {
           return _buildProfileBody(context, updatedUser);
         },
       ),
+      // Il pulsante "Contatta pilota" viene visualizzato in fondo alla pagina solo se
+      // il profilo non appartiene all'utente corrente (isSelf è false)
+      bottomNavigationBar: isSelf
+          ? null
+          : SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: ElevatedButton(
+            onPressed: () async {
+              // Utilizza il ChatService per creare o ottenere l'identificativo della chat
+              // relativa al pilota (basato sul suo uid)
+              try {
+                final chatId = await ChatService().createOrGetChat(user.uid);
+                if (chatId.isNotEmpty) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatPage(chatId: chatId),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Errore nell'avvio della chat.")),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Errore: $e")),
+                );
+              }
+            },
+            child: const Text("Contatta pilota"),
+          ),
+        ),
+      ),
     );
   }
 
-  /// Costruisce il corpo del profilo utente.
+  /// Costruisce il corpo principale del profilo utente.
+  /// Utilizza un DefaultTabController per gestire le schede "Su di me", "Informazioni" e "Recensioni".
   Widget _buildProfileBody(BuildContext context, AppUser user) {
     final theme = Theme.of(context);
+    // Recupera l'URL dell'immagine profilo o usa un placeholder se non presente
     final profileImageUrl = user.profileImageUrl;
     final avatar = (profileImageUrl != null && profileImageUrl.isNotEmpty)
         ? NetworkImage(profileImageUrl)
         : const AssetImage('assets/placeholder.png') as ImageProvider;
 
+    // Conteggio dei segnaposti e dei posti salvati
     final segnapostiCount = user.uploadedPlaces.length;
     final salvatiCount = user.favoritePlaces.length;
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: SingleChildScrollView(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 16),
-            // Avatar in un contenitore con sfondo chiaro e bordi arrotondati.
-            Container(
-              padding: const EdgeInsets.all(8),
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey[300],
-                backgroundImage: avatar,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (user.username.isNotEmpty)
-              Text(
-                user.username,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            // Chips per Località, Livello e Ore di volo
+            // Header simile ad Instagram: immagine profilo, username e chip per livello/esperienza
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (user.location != null && user.location!.isNotEmpty)
-                    Chip(
-                      avatar: const Icon(Icons.location_on, size: 16),
-                      label: Text(user.location!),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                height: 100,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey[300],
+                      backgroundImage: avatar,
                     ),
-                  if (user.pilotLevel != null)
-                    Chip(
-                      avatar: const Icon(Icons.airplanemode_active, size: 16),
-                      label: Text('Livello: ${user.pilotLevel}'),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (user.username.isNotEmpty)
+                            Text(
+                              user.username,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          const SizedBox(height: 8),
+                          // Mostra chip per livello e ore di volo
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: [
+                              if (user.pilotLevel != null)
+                                Chip(
+                                  backgroundColor: Colors.blue.shade100,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  avatar: const Icon(
+                                    Icons.airplanemode_active,
+                                    size: 12,
+                                  ),
+                                  label: Text(
+                                    '${user.pilotLevel}',
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                                ),
+                              if (user.flightExperience != null)
+                                Chip(
+                                  backgroundColor: Colors.blue,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  avatar: const Icon(Icons.timer, size: 12),
+                                  label: Text(
+                                    '${user.flightExperience} ore di volo',
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  if (user.flightExperience != null)
-                    Chip(
-                      avatar: const Icon(Icons.timer, size: 16),
-                      label: Text('Ore di volo: ${user.flightExperience}'),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
+            const Divider(color: Colors.grey, thickness: 1),
+            const SizedBox(height: 16),
+            // Statistiche: "Segnaposti" e, se l'utente è il proprietario, anche "Salvati"
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 InkWell(
-                  onTap: () {
+                  onTap: isOwner
+                      ? () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -131,37 +221,49 @@ class ProfilePage extends StatelessWidget {
                         ),
                       ),
                     );
-                  },
+                  }
+                      : null,
                   child: _buildStatItem(context, 'Segnaposti', segnapostiCount.toString()),
                 ),
-                InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FavoritesPage(
-                          placeIds: user.favoritePlaces,
+                if (isOwner) ...[
+                  Container(
+                    height: 40,
+                    child: const VerticalDivider(
+                      color: Colors.grey,
+                      thickness: 1,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: isOwner
+                        ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FavoritesPage(
+                            placeIds: user.favoritePlaces,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                  child: _buildStatItem(context, 'Salvati', salvatiCount.toString()),
-                ),
+                      );
+                    }
+                        : null,
+                    child: _buildStatItem(context, 'Salvati', salvatiCount.toString()),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
-            // TabBar modernizzata con sfondo neutro.
-            Container(
-              color: Colors.grey[200],
-              child: TabBar(
-                labelColor: theme.colorScheme.primary,
-                unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.6),
-                indicatorColor: theme.colorScheme.primary,
-                tabs: const [
-                  Tab(text: "Su di me"),
-                  Tab(text: "Informazioni"),
-                ],
-              ),
+            const Divider(color: Colors.grey, thickness: 1),
+            const SizedBox(height: 16),
+            // TabBar per le sezioni "Su di me", "Informazioni" e "Recensioni"
+            TabBar(
+              labelColor: theme.colorScheme.primary,
+              unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.6),
+              indicatorColor: theme.colorScheme.primary,
+              tabs: const [
+                Tab(text: "Su di me"),
+                Tab(text: "Informazioni"),
+                Tab(text: "Recensioni"),
+              ],
             ),
             SizedBox(
               height: 500,
@@ -169,6 +271,7 @@ class ProfilePage extends StatelessWidget {
                 children: [
                   _AboutMeSection(user: user),
                   _InfoSection(user: user),
+                  const _ReviewsSection(),
                 ],
               ),
             ),
@@ -178,6 +281,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  /// Costruisce un widget per visualizzare ciascuna statistica (per esempio, "Segnaposti" o "Salvati")
   Widget _buildStatItem(BuildContext context, String label, String value) {
     final theme = Theme.of(context);
     return Column(
@@ -200,7 +304,7 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
-/// Sezione "Su di me" con biografia e mappa.
+/// Sezione "Su di me": mostra la biografia e, se disponibile, la mappa della località.
 class _AboutMeSection extends StatefulWidget {
   final AppUser user;
   const _AboutMeSection({required this.user});
@@ -211,8 +315,6 @@ class _AboutMeSection extends StatefulWidget {
 
 class _AboutMeSectionState extends State<_AboutMeSection> {
   bool _isExpanded = false;
-  // Inserisci qui la tua Google Maps Static API Key
-  static const String _googleMapsApiKey = "LA_TUA_API_KEY";
 
   @override
   Widget build(BuildContext context) {
@@ -222,75 +324,93 @@ class _AboutMeSectionState extends State<_AboutMeSection> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Card moderna per la biografia.
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  bio,
-                  maxLines: maxLines,
-                  overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                if (!_isExpanded && _needsExpansion(bio))
-                  InkWell(
-                    onTap: () => setState(() => _isExpanded = true),
-                    child: Text(
-                      "Leggi tutto",
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+        // Box contenente la biografia
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                bio,
+                maxLines: maxLines,
+                overflow:
+                _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              if (!_isExpanded && _needsExpansion(bio))
+                InkWell(
+                  onTap: () => setState(() => _isExpanded = true),
+                  child: Text(
+                    "Leggi tutto...",
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.blueAccent[200],
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
-        // Visualizzazione della mappa se latitudine e longitudine sono disponibili.
+        // Se l'utente ha coordinate, mostra la mappa della località
         if (_hasLatLong(widget.user)) ...[
           Text(
             "Località",
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            clipBehavior: Clip.antiAlias,
-            child: _buildStaticMap(widget.user.latitude!, widget.user.longitude!),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              child: _buildOSMMap(widget.user.latitude!, widget.user.longitude!),
+            ),
           ),
         ],
       ],
     );
   }
 
-  Widget _buildStaticMap(double lat, double lng) {
-    final staticMapUrl =
-        "https://maps.googleapis.com/maps/api/staticmap?"
-        "center=$lat,$lng"
-        "&zoom=14"
-        "&size=600x300"
-        "&markers=color:red%7C$lat,$lng"
-        "&key=$_googleMapsApiKey";
-
-    return Image.network(
-      staticMapUrl,
-      fit: BoxFit.cover,
-      height: 180,
+  /// Costruisce una mappa OpenStreetMap della località data
+  Widget _buildOSMMap(double lat, double lng) {
+    return SizedBox(
+      height: 150,
+      child: FlutterMap(
+        options: MapOptions(
+          initialCenter: LatLng(lat, lng),
+          initialZoom: 10,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            userAgentPackageName: 'com.altura.app',
+          ),
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: LatLng(lat, lng),
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.blue,
+                    border: Border.all(color: Colors.white, width: 3),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   bool _needsExpansion(String text) => text.length > 200;
-  bool _hasLatLong(AppUser user) => (user.latitude != null && user.longitude != null);
+  bool _hasLatLong(AppUser user) =>
+      (user.latitude != null && user.longitude != null);
 }
 
-/// Sezione "Informazioni" con droni, social e certificazione.
+/// Sezione "Informazioni": mostra droni, social e certificazioni.
 class _InfoSection extends StatelessWidget {
   final AppUser user;
   const _InfoSection({required this.user});
@@ -302,83 +422,79 @@ class _InfoSection extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Card per i droni con lista in stile moderno e logo della marca.
         if (user.dronesList.isNotEmpty) ...[
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("I miei droni", style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: user.dronesList.map((drone) {
-                      return Chip(
-                        avatar: CircleAvatar(
-                          backgroundImage: AssetImage('assets/logos/${drone.toLowerCase()}.png'),
-                        ),
-                        label: Text(drone),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-        // Card per i social
-        if (_hasAnySocial(user)) ...[
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Social", style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  if (user.instagram != null && user.instagram!.isNotEmpty)
-                    _buildSocialRow(
-                      context,
-                      icon: Icons.camera_alt_outlined,
-                      label: "Instagram",
-                      value: user.instagram!,
-                    ),
-                  if (user.youtube != null && user.youtube!.isNotEmpty)
-                    _buildSocialRow(
-                      context,
-                      icon: Icons.video_collection_outlined,
-                      label: "YouTube",
-                      value: user.youtube!,
-                    ),
-                  if (user.website != null && user.website!.isNotEmpty)
-                    _buildSocialRow(
-                      context,
-                      icon: Icons.link,
-                      label: "Website",
-                      value: user.website!,
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-        // Card per la certificazione.
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
+          Container(
             padding: const EdgeInsets.all(16),
-            child: _buildCertificationInfo(context),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("I miei droni", style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: user.dronesList.map((drone) {
+                    return Chip(
+                      avatar: CircleAvatar(
+                        backgroundImage: AssetImage(
+                            'assets/logos/${drone.toLowerCase()}.png'),
+                      ),
+                      label: Text(drone),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 24),
+        ],
+        if (_hasAnySocial(user)) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Social", style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                if (user.instagram != null && user.instagram!.isNotEmpty)
+                  _buildSocialRow(
+                    context,
+                    icon: FontAwesomeIcons.instagram,
+                    label: "Instagram",
+                    value: user.instagram!,
+                  ),
+                if (user.youtube != null && user.youtube!.isNotEmpty)
+                  _buildSocialRow(
+                    context,
+                    icon: FontAwesomeIcons.youtube,
+                    label: "YouTube",
+                    value: user.youtube!,
+                  ),
+                if (user.website != null && user.website!.isNotEmpty)
+                  _buildSocialRow(
+                    context,
+                    icon: Icons.link,
+                    label: "Website",
+                    value: user.website!,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+        // Sezione certificazioni
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: _buildCertificationInfo(context),
         ),
       ],
     );
@@ -391,7 +507,7 @@ class _InfoSection extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Icon(icon, color: theme.colorScheme.primary),
+          FaIcon(icon, color: theme.colorScheme.primary),
           const SizedBox(width: 8),
           Text(
             "$label: $value",
@@ -409,12 +525,13 @@ class _InfoSection extends StatelessWidget {
     Color iconColor;
 
     if (user.certificationUrl != null && user.certificationUrl!.isNotEmpty) {
-      // Controlla lo stato della certificazione.
-      if (user.certificationStatus != null && user.certificationStatus == "approved") {
+      if (user.certificationStatus != null &&
+          user.certificationStatus == "approved") {
         certText = "Certificazione verificata";
         certIcon = Icons.check_circle;
         iconColor = Colors.green;
-      } else if (user.certificationStatus != null && user.certificationStatus == "pending") {
+      } else if (user.certificationStatus != null &&
+          user.certificationStatus == "pending") {
         certText = "Certificazione in corso di verifica";
         certIcon = Icons.hourglass_bottom;
         iconColor = Colors.orange;
@@ -445,5 +562,20 @@ class _InfoSection extends StatelessWidget {
     return (user.instagram != null && user.instagram!.isNotEmpty) ||
         (user.youtube != null && user.youtube!.isNotEmpty) ||
         (user.website != null && user.website!.isNotEmpty);
+  }
+}
+
+/// Sezione "Recensioni": placeholder per le recensioni.
+class _ReviewsSection extends StatelessWidget {
+  const _ReviewsSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        "Sezione Recensioni",
+        style: Theme.of(context).textTheme.headlineSmall,
+      ),
+    );
   }
 }

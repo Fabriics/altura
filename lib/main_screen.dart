@@ -1,4 +1,3 @@
-import 'package:altura/models/fake_users.dart';
 import 'package:altura/services/altura_loader.dart';
 import 'package:altura/views/home/chat/chat_list_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -37,9 +36,10 @@ class _MainScreenState extends State<MainScreen> {
 
     // Inizializziamo la lista di pagine
     _pages = const [
-      MapPage(),      // Pagina 0
-      RulesPage(),    // Pagina 1
-      FakeUsersScreen(),  // Pagina 2 (es. Piloti o Chat, in base alla logica dell'app)
+      MapPage(),
+      RulesPage(),
+      PilotPage(),
+      ChatListPage()
     ];
 
     // Carichiamo l'utente
@@ -188,8 +188,12 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Regole UAS',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: Icon(Icons.accessibility),
             label: 'Piloti',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.assignment_ind),
+            label: 'Esperti',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.chat),
@@ -235,6 +239,14 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
             // Voci di menu
+            _buildDrawerTile(
+              icon: Icons.person_2,
+              label: 'Diventa un esperto',
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.pushNamed(context, '/expert_page', arguments: _appUser);
+              },
+            ),
             _buildDrawerTile(
               icon: Icons.account_circle_outlined,
               label: 'Profilo',

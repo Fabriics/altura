@@ -6,27 +6,35 @@ import '../models/user_model.dart';
 
 class PilotService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final _pilotStreamController = StreamController<List<AppUser>>.broadcast();
+  final StreamController<List<AppUser>> _pilotStreamController =
+  StreamController<List<AppUser>>.broadcast();
 
-  // La posizione utente verrà impostata dopo averla recuperata
+  Stream<List<AppUser>> get pilotStream => _pilotStreamController.stream;
+
   GeoFirePoint? _userLocation;
   double _userLat = 0;
   double _userLng = 0;
+
+  // Parametri filtri
   double _radius = 30;
   bool _certifiedOnly = false;
   bool _availableOnly = true;
   List<String> _droneTypes = [];
   bool _sortByDistance = false;
 
-  Stream<List<AppUser>> get pilotStream => _pilotStreamController.stream;
+  StreamSubscription<List<DocumentSnapshot>>? _geoSubscription;
 
   Future<void> fetchUserLocationAndPilots() async {
-    final pos = await Geolocator.getCurrentPosition();
-    // Creazione del GeoFirePoint in base alla posizione corrente
-    _userLocation = GeoFirePoint(GeoPoint(pos.latitude, pos.longitude));
-    _userLat = pos.latitude;
-    _userLng = pos.longitude;
-    _queryPilots();
+    try {
+      final Position pos = await Geolocator.getCurrentPosition();
+      _userLocation = GeoFirePoint(GeoPoint(pos.latitude, pos.longitude));
+      _userLat = pos.latitude;
+      _userLng = pos.longitude;
+      _queryPilots();
+    } catch (error) {
+      _pilotStreamController.addError(
+          "Errore nel recupero della posizione: $error");
+    }
   }
 
   void applyFilters({
@@ -45,21 +53,28 @@ class PilotService {
   }
 
   void _queryPilots() {
-    // Inizializza la reference alla collection "users" senza applicare filtri
-    CollectionReference usersCollection = _firestore.collection('users');
+    if (_userLocation == null) return;
 
-    // Creazione della GeoCollectionReference utilizzando il CollectionReference
-    GeoCollectionReference geoRef = GeoCollectionReference(usersCollection);
-    geoRef.subscribeWithin(
+    // Annulla eventuale subscription precedente
+    _geoSubscription?.cancel();
+
+    CollectionReference usersRef = _firestore.collection('users');
+    final geoRef = GeoCollectionReference(usersRef);
+
+    _geoSubscription = geoRef.subscribeWithin(
       center: _userLocation!,
       radiusInKm: _radius,
       field: 'locationGeo',
-      geopointFrom: (data) =>
-      (data['locationGeo'] as Map<String, dynamic>)['geopoint'] as GeoPoint,
-      strictMode: true,
-      // Il parametro "limit" è stato rimosso perché non esiste in subscribeWithin
+      geopointFrom: (data) {
+        final map = data as Map<String, dynamic>;
+        if (map.containsKey('geopoint') && map['geopoint'] is GeoPoint) {
+          return map['geopoint'] as GeoPoint;
+        }
+        return _userLocation!.geopoint;
+      },
+      strictMode: false,
     ).listen((snapshots) {
-      var filtered = snapshots
+      List<AppUser> pilots = snapshots
           .map((doc) => AppUser.fromMap(doc.data() as Map<String, dynamic>))
           .where((user) =>
       user.uid.isNotEmpty &&
@@ -67,39 +82,55 @@ class PilotService {
           user.longitude != null)
           .map((user) {
         final double dist = Geolocator.distanceBetween(
-          _userLat,
-          _userLng,
-          user.latitude!,
-          user.longitude!,
-        ) / 1000; // conversione da metri a km
+            _userLat, _userLng, user.latitude!, user.longitude!) /
+            1000;
         return user.copyWith(distanceKm: dist);
       }).toList();
 
-      // Ordinamento: se l'esperienza di volo è uguale, ordina per distanza;
-      // altrimenti ordina per flightExperience in ordine decrescente
+      if (_certifiedOnly) {
+        pilots = pilots.where((user) => user.isCertified == true).toList();
+      }
+      if (_availableOnly) {
+        pilots = pilots.where((user) => user.isAvailable == true).toList();
+      }
+      if (_droneTypes.isNotEmpty) {
+        pilots = pilots
+            .where((user) =>
+            user.dronesList.any((drone) => _droneTypes.contains(drone)))
+            .toList();
+      }
+
       if (_sortByDistance) {
-        filtered.sort((a, b) {
-          if ((a.flightExperience ?? 0) == (b.flightExperience ?? 0)) {
-            return (a.distanceKm ?? 9999).compareTo(b.distanceKm ?? 9999);
+        pilots.sort((a, b) =>
+            (a.distanceKm ?? double.infinity)
+                .compareTo(b.distanceKm ?? double.infinity));
+      } else {
+        pilots.sort((a, b) {
+          int expComp =
+          (b.flightExperience ?? 0).compareTo(a.flightExperience ?? 0);
+          if (expComp == 0) {
+            return (a.distanceKm ?? double.infinity)
+                .compareTo(b.distanceKm ?? double.infinity);
           }
-          return (b.flightExperience ?? 0).compareTo(a.flightExperience ?? 0);
+          return expComp;
         });
       }
 
-      // Limita il numero di elementi a 50, se necessario
-      if (filtered.length > 50) {
-        filtered = filtered.take(50).toList();
+      if (pilots.length > 50) {
+        pilots = pilots.take(50).toList();
       }
-
-      _pilotStreamController.add(filtered);
+      _pilotStreamController.add(pilots);
+    }, onError: (error) {
+      _pilotStreamController.addError(error);
     });
   }
 
   Future<void> setCurrentUserAvailable(String uid) async {
-    await _firestore.collection('users').doc(uid).update({
-      'isAvailable': true,
-    });
+    await _firestore.collection('users').doc(uid).update({'isAvailable': true});
   }
 
-  void dispose() => _pilotStreamController.close();
+  void dispose() {
+    _geoSubscription?.cancel();
+    _pilotStreamController.close();
+  }
 }

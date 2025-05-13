@@ -73,8 +73,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
           _locationController.text = data['location'] ?? '';
           _profileImageUrl = data['profileImageUrl'];
           // Se sono presenti droni, li carica
-          if (data['drones'] != null) {
-            final List<dynamic> droneList = data['drones'];
+          if (data['dronesList'] != null) {
+            final List<dynamic> droneList = data['dronesList'];
             for (var d in droneList) {
               _addedDrones.add(d.toString());
             }
@@ -136,9 +136,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'website': _websiteController.text.trim(),
         'instagram': _instagramController.text.trim(),
         'youtube': _youtubeController.text.trim(),
-        'flightExperience': _flightHours.toString(),
+        'flightExperience': _flightHours,
         'pilotLevel': _pilotLevel,
-        'drones': _addedDrones,
+        'dronesList': _addedDrones,
         'certificationUrl': _certificationFileUrl,
         'certificationType': _certificationType,
       };

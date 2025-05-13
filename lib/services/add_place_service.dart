@@ -1,13 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart' as lt show LatLng;
 import '../../models/place_category.dart';
 import '../../services/place_controller.dart';
 
 class AddPlaceService extends StatefulWidget {
-  final LatLng latLng;
-  const AddPlaceService({Key? key, required this.latLng}) : super(key: key);
-
+  final lt.LatLng latLng;
+  const AddPlaceService({super.key, required this.latLng});
   @override
   _AddPlaceServiceState createState() => _AddPlaceServiceState();
 }
@@ -19,7 +18,6 @@ class _AddPlaceServiceState extends State<AddPlaceService> {
   String? description;
   bool requiresPermission = false;
   String? permissionDetails;
-
   final PlacesController _placesController = PlacesController();
 
   void _pickMedia() async {
@@ -56,7 +54,6 @@ class _AddPlaceServiceState extends State<AddPlaceService> {
       );
       return;
     }
-
     Navigator.pop(context, {
       'category': selectedCategory!.name,
       'media': chosenMedia,
@@ -80,10 +77,9 @@ class _AddPlaceServiceState extends State<AddPlaceService> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Campo per il titolo
               Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
                 padding: const EdgeInsets.all(6),
                 child: TextField(
                   onChanged: (val) => title = val,
@@ -109,10 +105,9 @@ class _AddPlaceServiceState extends State<AddPlaceService> {
                 ),
               ),
               const SizedBox(height: 8),
+              // Campo per la descrizione
               Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
                 padding: const EdgeInsets.all(8),
                 child: TextField(
                   onChanged: (val) => description = val,
@@ -123,25 +118,25 @@ class _AddPlaceServiceState extends State<AddPlaceService> {
                   decoration: InputDecoration(
                     labelText: "Descrizione",
                     hintText: "Es: Descrizione e dettagli del luogo",
-                  filled: true,
-                  fillColor: const Color.fromRGBO(248, 249, 250, 1),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: const Color.fromRGBO(248, 249, 250, 1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade400),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade400),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
+                    ),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade400),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
-                  ),
-                ),
                 ),
               ),
               const SizedBox(height: 14),
-              Divider(color: Theme.of(context).colorScheme.primary, thickness: 0.7,),
+              const Divider(thickness: 0.7),
               const SizedBox(height: 14),
               Text("Seleziona la Categoria", style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 5),
@@ -149,13 +144,11 @@ class _AddPlaceServiceState extends State<AddPlaceService> {
                 categories: placeCategories,
                 selected: selectedCategory,
                 onSelected: (cat) {
-                  setState(() {
-                    selectedCategory = cat;
-                  });
+                  setState(() { selectedCategory = cat; });
                 },
               ),
               const SizedBox(height: 14),
-              Divider(color: Theme.of(context).colorScheme.primary, thickness: 0.7,),
+              const Divider(thickness: 0.7),
               const SizedBox(height: 14),
               SwitchListTile(
                 value: requiresPermission,
@@ -169,10 +162,7 @@ class _AddPlaceServiceState extends State<AddPlaceService> {
               if (requiresPermission)
                 Container(
                   margin: const EdgeInsets.only(top: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.all(8),
                   child: TextField(
                     onChanged: (val) => permissionDetails = val,
@@ -186,14 +176,11 @@ class _AddPlaceServiceState extends State<AddPlaceService> {
                   ),
                 ),
               const SizedBox(height: 14),
-              Divider(color: Theme.of(context).colorScheme.primary, thickness: 0.7,),
+              const Divider(thickness: 0.7),
               const SizedBox(height: 14),
-
+              // Bottone per selezionare i media
               Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(12)),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(8),
                   onTap: _pickMedia,
@@ -261,10 +248,7 @@ class _AddPlaceServiceState extends State<AddPlaceService> {
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                   ),
-                  child: const Text(
-                    "Salva",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+                  child: const Text("Salva", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 16),

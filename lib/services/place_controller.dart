@@ -2,35 +2,33 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart' as lt;
+import '../models/custom_category_marker.dart';
 import '../models/place_model.dart';
 
 /// Controller per gestire i segnaposti.
-/// Questo controller interagisce con Firestore e Firebase Storage e gestisce la
-/// selezione dei media (foto e video) tramite ImagePicker.
+/// Interagisce con Firestore e Firebase Storage e gestisce la selezione dei media (foto/video)
+/// tramite ImagePicker.
 class PlacesController extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final String _collectionPath = 'places';
   final List<Place> _places = [];
   final Set<Marker> _markers = {};
-
-  // Per caricare media dal device
   final ImagePicker _imagePicker = ImagePicker();
-  
+
   PlacesController() {
-    //_loadCustomIcons();
     loadPlacesFromFirestore();
   }
 
   List<Place> get places => _places;
   Set<Marker> get markers => _markers;
-  
-  /// Carica i segnaposti da Firestore.
+
+  /// Carica i segnaposti da Firestore utilizzando snapshots per l'aggiornamento in tempo reale.
   Future<void> loadPlacesFromFirestore() async {
-    try {
-      final snapshot = await _firestore.collection(_collectionPath).get();
+    _firestore.collection(_collectionPath).snapshots().listen((snapshot) {
       final List<Place> loadedPlaces = [];
       for (final doc in snapshot.docs) {
         final data = doc.data();
@@ -41,9 +39,7 @@ class PlacesController extends ChangeNotifier {
         ..clear()
         ..addAll(loadedPlaces);
       _createMarkersFromPlaces();
-    } catch (e) {
-      debugPrint('Errore nel loadPlaces: $e');
-    }
+    });
   }
 
   /// Aggiunge un nuovo segnaposto con supporto a più media (foto/video).
@@ -57,11 +53,9 @@ class PlacesController extends ChangeNotifier {
     List<File>? mediaFiles,
   }) async {
     final placeId = DateTime.now().millisecondsSinceEpoch.toString();
-    final finalTitle = (title != null && title.isNotEmpty)
-        ? title
-        : 'Segnaposto #${_places.length + 1}';
+    final finalTitle =
+    (title != null && title.isNotEmpty) ? title : 'Segnaposto #${_places.length + 1}';
 
-    // Carica ogni file e raccoglie gli URL di download.
     List<String> downloadUrls = [];
     if (mediaFiles != null && mediaFiles.isNotEmpty) {
       for (final file in mediaFiles) {
@@ -81,8 +75,7 @@ class PlacesController extends ChangeNotifier {
       category: category,
       description: description,
       mediaUrls: downloadUrls.isNotEmpty ? downloadUrls : null,
-      // createdAt viene impostato in Firestore
-      mediaFiles: mediaFiles, // Puoi mantenerli in memoria se necessario
+      mediaFiles: mediaFiles,
     );
 
     final dataToSave = {
@@ -97,16 +90,12 @@ class PlacesController extends ChangeNotifier {
     };
 
     try {
-      // Salva su Firestore.
       await _firestore.collection(_collectionPath).doc(placeId).set(dataToSave);
-
-      // Aggiorna la lista dei segnaposti dell'utente (opzionale).
       await _firestore.collection('users').doc(userId).update({
         'uploadedPlaces': FieldValue.arrayUnion([placeId]),
       }).catchError((err) {
         debugPrint('Non riesco ad aggiornare l\'utente: $err');
       });
-
       _places.add(newPlace);
       _createMarkersFromPlaces();
       return newPlace;
@@ -119,11 +108,11 @@ class PlacesController extends ChangeNotifier {
   /// Carica un file (foto o video) su Firebase Storage e restituisce l'URL.
   Future<String?> _uploadMediaFile(String placeId, File file) async {
     try {
-      final fileName = "${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}";
+      final fileName =
+          "${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}";
       final ref = _storage.ref().child('placeMedia/$placeId/$fileName');
       await ref.putFile(file);
-      final downloadUrl = await ref.getDownloadURL();
-      return downloadUrl;
+      return await ref.getDownloadURL();
     } catch (e) {
       debugPrint('Errore upload file: $e');
       return null;
@@ -146,14 +135,11 @@ class PlacesController extends ChangeNotifier {
         return;
       }
       final oldPlace = _places[oldIndex];
-      // Unisce gli URL esistenti a quelli nuovi.
       List<String> downloadUrls = oldPlace.mediaUrls ?? [];
       if (newMediaFiles != null && newMediaFiles.isNotEmpty) {
         for (final file in newMediaFiles) {
           final url = await _uploadMediaFile(placeId, file);
-          if (url != null) {
-            downloadUrls.add(url);
-          }
+          if (url != null) downloadUrls.add(url);
         }
       }
       final dataToUpdate = {
@@ -168,7 +154,6 @@ class PlacesController extends ChangeNotifier {
         description: newDescription,
         category: newCategory,
         mediaUrls: downloadUrls,
-        // Puoi decidere se aggiornare anche mediaFiles.
       );
       _places[oldIndex] = updatedPlace;
       _createMarkersFromPlaces();
@@ -179,14 +164,56 @@ class PlacesController extends ChangeNotifier {
     }
   }
 
+  /// Cancella un segnaposto e tutti i relativi file da Firebase Storage.
   Future<void> deletePlace(String placeId) async {
     try {
+      // Recupera il segnaposto per ottenere le URL dei file.
+      final placeDoc = await _firestore.collection(_collectionPath).doc(placeId).get();
+      if (placeDoc.exists && placeDoc.data() != null) {
+        final data = placeDoc.data()!;
+        final List<dynamic> urls = data['mediaUrls'] ?? [];
+        for (final url in urls) {
+          try {
+            final ref = _storage.refFromURL(url.toString());
+            await ref.delete();
+          } catch (e) {
+            debugPrint('Errore nella cancellazione del file da Storage: $e');
+          }
+        }
+      }
       await _firestore.collection(_collectionPath).doc(placeId).delete();
       _places.removeWhere((p) => p.id == placeId);
       _createMarkersFromPlaces();
       notifyListeners();
     } catch (e) {
       debugPrint('Errore eliminazione place $placeId: $e');
+    }
+  }
+
+  /// Rimuove un media esistente (URL) dal segnaposto su Firebase.
+  Future<void> removeMediaFromPlace(String placeId, {required bool isUrl, required int index}) async {
+    try {
+      final docSnapshot = await _firestore.collection(_collectionPath).doc(placeId).get();
+      if (!docSnapshot.exists) return;
+      final data = docSnapshot.data();
+      List<dynamic> mediaList = data?['mediaUrls'] ?? [];
+      if (index < 0 || index >= mediaList.length) return;
+      if (isUrl) {
+        final String url = mediaList[index].toString();
+        try {
+          final ref = _storage.refFromURL(url);
+          await ref.delete();
+        } catch (e) {
+          debugPrint("Errore nella cancellazione del file da Storage: $e");
+        }
+        mediaList.removeAt(index);
+      }
+      // Aggiorna il documento Firestore con la lista modificata.
+      await _firestore.collection(_collectionPath).doc(placeId).update({
+        'mediaUrls': mediaList,
+      });
+    } catch (e) {
+      debugPrint('Errore in removeMediaFromPlace: $e');
     }
   }
 
@@ -197,11 +224,7 @@ class PlacesController extends ChangeNotifier {
         maxWidth: 1024,
         maxHeight: 1024,
       );
-      if (xfiles.isNotEmpty) {
-        return xfiles.map((xfile) => File(xfile.path)).toList();
-      } else {
-        return [];
-      }
+      return xfiles.isNotEmpty ? xfiles.map((xfile) => File(xfile.path)).toList() : [];
     } catch (e) {
       debugPrint('Errore pickMedia: $e');
       return null;
@@ -212,17 +235,19 @@ class PlacesController extends ChangeNotifier {
   void _createMarkersFromPlaces() {
     final Set<Marker> newMarkers = {};
     for (final place in _places) {
-      final marker = Marker(
-        markerId: MarkerId(place.id),
-        position: LatLng(place.latitude, place.longitude),
-        icon: BitmapDescriptor.defaultMarker,
-        anchor: Offset(0.5, 1.05),
-        infoWindow: InfoWindow(
-          title: place.name,
-          snippet: place.description ?? 'Nessuna descrizione',
+      newMarkers.add(
+        Marker(
+          point: lt.LatLng(place.latitude, place.longitude),
+          width: 40,
+          height: 40,
+          child: GestureDetector(
+            onTap: () {
+              // Azione al tocco sul marker (se desiderata)
+            },
+            child: CustomCategoryMarker(category: place.category),
+          ),
         ),
       );
-      newMarkers.add(marker);
     }
     _markers
       ..clear()

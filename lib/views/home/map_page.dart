@@ -1,11 +1,12 @@
-import 'dart:io';
 import 'package:altura/views/home/place_details_page.dart';
-import 'package:altura/services/add_place_service.dart'; // Importa la nuova pagina
+import 'package:altura/services/add_place_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as lt;
 import 'package:timeago/timeago.dart' as timeago;
+import '../../models/custom_category_marker.dart';
 import '../../models/place_category.dart';
 import '../../models/place_model.dart';
 import '../../services/altura_loader.dart';
@@ -14,7 +15,6 @@ import '../../services/place_controller.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
-
   @override
   State<MapPage> createState() => _MapPageState();
 }
@@ -28,17 +28,20 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   String _selectedUsername = 'Sconosciuto';
   int _selectedLikeCount = 0;
   String? _selectedProfileImageUrl;
-  LatLng? _tempSelectedPosition;
+  lt.LatLng? _tempSelectedPosition;
 
-  // Lista di filtri (categorie) attive
+  // Lista di filtri attivi (categorie)
   List<PlaceCategory> _selectedFilterCategories = [];
-  String? selectedCategory; // (non più utilizzato per lo step)
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _placesController = PlacesController();
+    // Aggiungo un listener sul PlacesController per aggiornare la UI quando i segnaposti cambiano.
+    _placesController.addListener(() {
+      setState(() {});
+    });
     _mapService = MapService(placesController: _placesController);
     _mapService.initLocation(context: context);
     _initUser();
@@ -65,6 +68,8 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _mapService.removeListener(() { setState(() {}); });
+    _placesController.removeListener(() { setState(() {}); });
     _mapService.dispose();
     super.dispose();
   }
@@ -77,26 +82,21 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   }
 
   /// Gestisce l'aggiunta del marker in modalità "selezione".
-  /// Invece di aprire un bottom sheet, naviga verso la pagina AddPlaceService.
-  Future<void> _handleAddPlace(LatLng position) async {
-    // Imposta una posizione temporanea (se vuoi visualizzare un marker in attesa)
+  Future<void> _handleAddPlace(lt.LatLng position) async {
     setState(() {
       _tempSelectedPosition = position;
     });
 
-    // Avvia la pagina per aggiungere il segnaposto e attendi il risultato
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => AddPlaceService(latLng: position)),
     );
 
-    // Se viene restituito un risultato, procedi con la creazione del segnaposto
     if (result != null) {
       debugPrint('Risultato dal nuovo segnaposto: $result');
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        // Crea un nuovo oggetto Place utilizzando i dati restituiti dalla pagina
-        final newPlace = await _placesController.addPlace(
+        await _placesController.addPlace(
           latitude: position.latitude,
           longitude: position.longitude,
           userId: user.uid,
@@ -105,23 +105,9 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           description: result['description'] ?? '',
           mediaFiles: result['media'] ?? [],
         );
-
-        // Aggiungi il nuovo marker al set dei marker (gestito dal PlacesController)
-        setState(() {
-          _placesController.markers.add(
-            Marker(
-              markerId: MarkerId(newPlace.id),
-              position: LatLng(newPlace.latitude, newPlace.longitude),
-              onTap: () => _showPlaceDetails(newPlace),
-            ),
-          );
-        });
-
-        // Aggiorna i dati dell'utente su Firestore (per esempio, associando il nuovo segnaposto)
-        await _mapService.updateUserPlaces(user.uid, newPlace.id);
+        await _mapService.updateUserPlaces(user.uid, result['id'] ?? '');
       }
     }
-    // Resetta la modalità di selezione e la posizione temporanea
     setState(() {
       _selectingPosition = false;
       _tempSelectedPosition = null;
@@ -134,10 +120,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     String? profileImageUrl;
     int likeCount = 0;
     try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(place.userId)
-          .get();
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(place.userId).get();
       if (userDoc.exists && userDoc.data() != null) {
         username = userDoc.data()!['username'] ?? 'Senza nome';
         profileImageUrl = userDoc.data()!['profileImageUrl'] as String? ?? '';
@@ -146,10 +129,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       debugPrint('Errore nel recuperare il nome utente: $e');
     }
     try {
-      final placeDoc = await FirebaseFirestore.instance
-          .collection('places')
-          .doc(place.id)
-          .get();
+      final placeDoc = await FirebaseFirestore.instance.collection('places').doc(place.id).get();
       if (placeDoc.exists && placeDoc.data() != null) {
         likeCount = placeDoc.data()!['likeCount'] ?? 0;
       }
@@ -164,7 +144,47 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     });
   }
 
-  /// Costruisce la card che mostra i dettagli del segnaposto, inclusi i nuovi campi.
+  /// Costruisce i marker personalizzati per i segnaposti.
+  List<Marker> _buildMarkers() {
+    final markers = _placesController.places.where((place) {
+      if (_selectedFilterCategories.isEmpty ||
+          _selectedFilterCategories.any((cat) => cat.name == 'Tutte')) {
+        return true;
+      }
+      bool match = false;
+      if (_selectedFilterCategories.any((cat) => cat.name == 'Super Place') &&
+          (place.likeCount != null && place.likeCount! >= 20)) {
+        match = true;
+      }
+      if (_selectedFilterCategories.any((cat) => cat.name == place.category)) {
+        match = true;
+      }
+      return match;
+    }).map((place) {
+      return Marker(
+        width: 40,
+        height: 40,
+        point: lt.LatLng(place.latitude, place.longitude),
+        child: GestureDetector(
+          onTap: () => _showPlaceDetails(place),
+          child: CustomCategoryMarker(category: place.category),
+        ),
+      );
+    }).toList();
+
+    if (_tempSelectedPosition != null) {
+      markers.add(
+        Marker(
+          width: 40,
+          height: 40,
+          point: _tempSelectedPosition!,
+          child: const Icon(Icons.location_on, color: Colors.blue, size: 40),
+        ),
+      );
+    }
+    return markers;
+  }
+
   Widget _buildFixedPlaceCard(Place place, String username, int likeCount) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -174,7 +194,11 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => PlaceDetailsPage(place: place)),
-          );
+          ).then((_) {
+            setState(() {
+              _selectedPlace = null;
+            });
+          });
         },
         child: Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -184,15 +208,57 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Immagine
+              // Immagine con overlay
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                child: SizedBox(
-                  height: 140,
-                  width: double.infinity,
-                  child: _buildPlaceImage(place),
+                child: Stack(
+                  children: [
+                    SizedBox(
+                      height: 140,
+                      width: double.infinity,
+                      child: _buildPlaceImage(place),
+                    ),
+                    // Overlay in basso a sinistra: icona categoria e permesso (se presente)
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: Row(
+                        children: [
+                          CustomCategoryMarker(category: place.category),
+                          if (place.requiresPermission)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 4),
+                              child: Icon(Icons.lock, color: Colors.white, size: 20),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Overlay in basso a destra: icona dei like e conteggio
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.favorite, color: Colors.white, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$likeCount',
+                              style: const TextStyle(color: Colors.white, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              // Sezione informazioni testuali sotto l'immagine
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
@@ -215,43 +281,15 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
                         overflow: TextOverflow.ellipsis,
                       ),
                     const SizedBox(height: 8),
-                    // Visualizzazione della Categoria
-                    Text(
-                      "Categoria: ${place.category}",
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 4),
-                    // Visualizzazione del flag e eventuali dettagli di autorizzazione
-                    Row(
-                      children: [
-                        Text(
-                          "Autorizzazione: ${place.requiresPermission == true ? 'Richiesta' : 'Non richiesta'}",
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        if (place.requiresPermission == true &&
-                            place.permissionDetails != null &&
-                            place.permissionDetails!.isNotEmpty)
-                          Expanded(
-                            child: Text(
-                              " (${place.permissionDetails})",
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Informazioni sull'utente e tempo trascorso dalla creazione
+                    // Informazioni utente e tempo trascorso
                     Row(
                       children: [
                         CircleAvatar(
                           radius: 14,
-                          backgroundImage: (_selectedProfileImageUrl != null &&
-                              _selectedProfileImageUrl!.isNotEmpty)
+                          backgroundImage: (_selectedProfileImageUrl != null && _selectedProfileImageUrl!.isNotEmpty)
                               ? NetworkImage(_selectedProfileImageUrl!)
                               : null,
-                          child: (_selectedProfileImageUrl == null ||
-                              _selectedProfileImageUrl!.isEmpty)
+                          child: (_selectedProfileImageUrl == null || _selectedProfileImageUrl!.isEmpty)
                               ? Text(
                             username.substring(0, 1).toUpperCase(),
                             style: const TextStyle(color: Colors.white),
@@ -271,18 +309,6 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
                             timeago.format(place.createdAt!),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Like count
-                    Row(
-                      children: [
-                        Icon(Icons.favorite, size: 16, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$likeCount',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
                       ],
                     ),
                   ],
@@ -310,9 +336,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     } else {
       return Container(
         color: Colors.grey[200],
-        child: const Center(
-          child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
-        ),
+        child: const Center(child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey)),
       );
     }
   }
@@ -328,107 +352,66 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
         children: [
           (_mapService.isLoading)
               ? const Center(child: AlturaLoader())
-              : GoogleMap(
-            onMapCreated: (controller) {
-              _mapService.mapController = controller;
-            },
-            onTap: (LatLng pos) {
-              if (_selectingPosition) {
-                _handleAddPlace(pos);
-              } else {
-                setState(() => _selectedPlace = null);
-              }
-            },
-            onLongPress: (LatLng pos) {
-              if (_selectingPosition) {
-                _handleAddPlace(pos);
-              }
-            },
-            myLocationEnabled: _mapService.hasLocationPermission,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            initialCameraPosition: CameraPosition(
-              target: _mapService.hasLocationPermission &&
+              : FlutterMap(
+            mapController: _mapService.mapController,
+            options: MapOptions(
+              initialCenter: _mapService.hasLocationPermission &&
                   _mapService.currentLocation != null
-                  ? LatLng(
-                _mapService.currentLocation!.latitude!,
-                _mapService.currentLocation!.longitude!,
-              )
+                  ? lt.LatLng(_mapService.currentLocation!.latitude!, _mapService.currentLocation!.longitude!)
                   : _mapService.defaultPosition,
-              zoom: 14.0,
+              initialZoom: 14.0,
+              onTap: (tapPosition, latlng) {
+                if (_selectingPosition) {
+                  _handleAddPlace(latlng);
+                } else {
+                  setState(() => _selectedPlace = null);
+                }
+              },
+              onLongPress: (tapPosition, latlng) {
+                if (_selectingPosition) _handleAddPlace(latlng);
+              },
             ),
-            markers: () {
-              final filteredMarkers =
-              _placesController.markers.where((marker) {
-                final place = _placesController.places.firstWhere(
-                      (p) => p.id == marker.markerId.value,
-                  orElse: () => Place(
-                    id: '',
-                    name: '',
-                    latitude: 0,
-                    longitude: 0,
-                    userId: '',
-                    category: '',
-                  ),
-                );
-                if (_selectedFilterCategories.isEmpty ||
-                    _selectedFilterCategories
-                        .any((cat) => cat.name == 'Tutte')) {
-                  return true;
-                }
-                bool match = false;
-                if (_selectedFilterCategories.any((cat) =>
-                cat.name == 'Super Place') &&
-                    (place.likeCount != null && place.likeCount! >= 20)) {
-                  match = true;
-                }
-                if (_selectedFilterCategories
-                    .any((cat) => cat.name == place.category)) {
-                  match = true;
-                }
-                return match;
-              });
-
-              final Set<Marker> markersSet =
-              filteredMarkers.map((marker) {
-                return marker.copyWith(
-                  onTapParam: () {
-                    final place = _placesController.places.firstWhere(
-                          (p) => p.id == marker.markerId.value,
-                      orElse: () => Place(
-                        id: '',
-                        name: '',
-                        latitude: 0,
-                        longitude: 0,
-                        userId: '',
-                        category: '',
+            children: [
+              TileLayer(
+                urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+              ),
+              MarkerLayer(markers: _buildMarkers()),
+              if (_mapService.hasLocationPermission && _mapService.currentLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      width: 20,
+                      height: 20,
+                      point: lt.LatLng(
+                        _mapService.currentLocation!.latitude!,
+                        _mapService.currentLocation!.longitude!,
                       ),
-                    );
-                    _showPlaceDetails(place);
-                  },
-                );
-              }).toSet();
-
-              if (_tempSelectedPosition != null) {
-                markersSet.add(
-                  Marker(
-                    markerId: const MarkerId('tempSelectedMarker'),
-                    position: _tempSelectedPosition!,
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueBlue),
-                  ),
-                );
-              }
-              return markersSet;
-            }(),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.blue,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          Positioned(
+            bottom: 4,
+            left: 4,
+            child: Text(
+              "© OpenStreetMap contributors, © CARTO",
+              style: const TextStyle(fontSize: 10, color: Colors.black45),
+            ),
           ),
           Positioned(
             top: topPadding + 16,
             left: 16,
             right: 16,
             child: Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(32),
               ),
@@ -436,10 +419,8 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
                 selected: _selectedFilterCategories,
                 onToggle: (cat) {
                   setState(() {
-                    if (_selectedFilterCategories
-                        .any((c) => c.name == cat.name)) {
-                      _selectedFilterCategories.removeWhere(
-                              (c) => c.name == cat.name);
+                    if (_selectedFilterCategories.any((c) => c.name == cat.name)) {
+                      _selectedFilterCategories.removeWhere((c) => c.name == cat.name);
                     } else {
                       _selectedFilterCategories.add(cat);
                     }
@@ -454,7 +435,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
             child: GestureDetector(
               onTap: () => _mapService.openSearchPage(
                 context: context,
-                onSearchResult: (latLng) {
+                onSearchResult: (latlng) {
                   setState(() {});
                 },
               ),
@@ -464,9 +445,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black26, blurRadius: 5)
-                  ],
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 5)],
                 ),
                 child: const Icon(Icons.search, color: Colors.black),
               ),
@@ -494,8 +473,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
                 if (!_selectingPosition)
                   FloatingActionButton(
                     heroTag: 'btnAdd',
-                    onPressed: () =>
-                        setState(() => _selectingPosition = true),
+                    onPressed: () => setState(() => _selectingPosition = true),
                     child: const Icon(Icons.add),
                   )
                 else
@@ -513,17 +491,14 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           ),
           if (_selectingPosition)
             Positioned(
-              bottom: 100,
-              right: 16,
+              bottom: 550,
+              right: 90,
+              left: 90,
               child: Container(
-                width: 150,
-                height: 150,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black26, blurRadius: 4)
-                  ],
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
                 ),
                 child: Center(
                   child: Padding(
@@ -548,8 +523,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
                 ),
                 child: SizedBox(
                   height: 300,
-                  child: _buildFixedPlaceCard(
-                      _selectedPlace!, _selectedUsername, _selectedLikeCount),
+                  child: _buildFixedPlaceCard(_selectedPlace!, _selectedUsername, _selectedLikeCount),
                 ),
               ),
             ),
@@ -562,7 +536,6 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
 class FullScreenMediaPage extends StatelessWidget {
   final Widget mediaWidget;
   const FullScreenMediaPage({super.key, required this.mediaWidget});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

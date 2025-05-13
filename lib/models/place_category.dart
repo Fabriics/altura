@@ -21,7 +21,7 @@ final List<PlaceCategory> placeCategories = [
   PlaceCategory(name: "Zona Cinematic", icon: "🏭", color: Colors.brown),
   PlaceCategory(name: "Zona freestyle", icon: "🌀", color: Colors.deepPurple),
   PlaceCategory(name: "Zona Indoor", icon: "🏟️", color: Colors.blueGrey),
-  PlaceCategory(name: "Zona vietata", icon: "🚫", color: Colors.red),
+  PlaceCategory(name: "Zona NoFLy", icon: "🚫", color: Colors.red),
   PlaceCategory(name: "Zona Panoramica", icon: "🌄", color: Colors.indigo),
   PlaceCategory(name: "Racing", icon: "🌄", color: Colors.deepPurple),
 ];
@@ -40,11 +40,11 @@ class CategoryGrid extends StatefulWidget {
   final List<PlaceCategory>? categories;
 
   const CategoryGrid({
-    Key? key,
+    super.key,
     required this.selected,
     required this.onSelected,
     this.categories,
-  }) : super(key: key);
+  });
 
   @override
   State<CategoryGrid> createState() => _CategoryGridState();
@@ -246,11 +246,11 @@ class MultiSelectCategoryGrid extends StatefulWidget {
   final List<PlaceCategory>? categories;
 
   const MultiSelectCategoryGrid({
-    Key? key,
+    super.key,
     required this.selected,
     required this.onToggle,
     this.categories,
-  }) : super(key: key);
+  });
 
   @override
   State<MultiSelectCategoryGrid> createState() =>
